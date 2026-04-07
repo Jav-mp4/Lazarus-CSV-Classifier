@@ -1,0 +1,244 @@
+object Form1: TForm1
+  Left = 429
+  Height = 606
+  Top = 250
+  Width = 1329
+  Caption = 'Form1'
+  ClientHeight = 606
+  ClientWidth = 1329
+  DesignTimePPI = 106
+  Menu = MainMenu1
+  LCLVersion = '4.4.0.0'
+  OnCreate = FormCreate
+  object Chart1: TChart
+    Left = 16
+    Height = 448
+    Top = 144
+    Width = 792
+    AxisList = <    
+      item
+        Marks.LabelBrush.Style = bsClear
+        Minors = <>
+        Title.LabelFont.Orientation = 900
+        Title.LabelBrush.Style = bsClear
+      end    
+      item
+        Alignment = calBottom
+        Marks.LabelBrush.Style = bsClear
+        Minors = <>
+        Title.LabelBrush.Style = bsClear
+      end>
+    Title.Text.Strings = (
+      'TAChart'
+    )
+    object Chart1LineSeries1: TLineSeries
+    end
+    object Chart1BarSeries1: TBarSeries
+      BarBrush.Color = clRed
+    end
+    object Chart1BoxAndWhiskerSeries1: TBoxAndWhiskerSeries
+    end
+  end
+  object XColEdit: TEdit
+    Left = 48
+    Height = 25
+    Top = 49
+    Width = 30
+    NumbersOnly = True
+    TabOrder = 1
+  end
+  object YColEdit: TEdit
+    Left = 88
+    Height = 25
+    Top = 49
+    Width = 30
+    NumbersOnly = True
+    TabOrder = 2
+  end
+  object XYCOLlBtn: TButton
+    Left = 128
+    Height = 25
+    Top = 49
+    Width = 64
+    Caption = 'Confirm'
+    TabOrder = 3
+    OnClick = XYCOLlBtnClick
+  end
+  object ColRangeLabel: TLabel
+    AnchorSideLeft.Side = asrBottom
+    Left = 100
+    Height = 17
+    Top = 33
+    Width = 7
+    Caption = '1'
+  end
+  object Label1: TLabel
+    Left = 56
+    Height = 34
+    Top = 16
+    Width = 60
+    Caption = '  Column  '#13#10' 1   -'
+  end
+  object DispersionTB: TToggleBox
+    Left = 48
+    Height = 28
+    Top = 110
+    Width = 83
+    Caption = 'Dispersion'
+    TabOrder = 4
+    OnChange = DispersionTBChange
+  end
+  object BarrasTB: TToggleBox
+    Left = 152
+    Height = 28
+    Top = 110
+    Width = 83
+    Caption = 'Bar'
+    TabOrder = 5
+    OnChange = BarrasTBChange
+  end
+  object ShowLineCheckBox: TCheckBox
+    Left = 48
+    Height = 21
+    Top = 86
+    Width = 48
+    Caption = 'Lines'
+    TabOrder = 6
+    Visible = False
+    OnChange = ShowLineCheckBoxChange
+  end
+  object ClasesCheckBox: TCheckBox
+    Left = 152
+    Height = 21
+    Top = 86
+    Width = 62
+    Caption = 'Classes'
+    TabOrder = 7
+    Visible = False
+    OnChange = ClasesCheckBoxChange
+  end
+  object DataStringGrid: TStringGrid
+    Left = 856
+    Height = 336
+    Top = 152
+    Width = 420
+    ColCount = 20
+    DefaultColWidth = 70
+    FixedCols = 0
+    RowCount = 20
+    ScrollBars = ssNone
+    TabOrder = 8
+    OnAfterSelection = DataStringGridAfterSelection
+  end
+  object StatisticsStringGrid: TStringGrid
+    Left = 856
+    Height = 78
+    Top = 490
+    Width = 420
+    ColCount = 10
+    DefaultColWidth = 70
+    DefaultRowHeight = 26
+    FixedCols = 0
+    FixedRows = 0
+    RowCount = 3
+    ScrollBars = ssNone
+    TabOrder = 9
+  end
+  object SymbolsImage: TImage
+    Left = 1280
+    Height = 78
+    Top = 490
+    Width = 24
+  end
+  object LeftScrollBtn: TButton
+    Left = 856
+    Height = 24
+    Top = 568
+    Width = 32
+    Caption = '←'
+    TabOrder = 10
+    OnClick = LeftScrollBtnClick
+  end
+  object RightScrollBtn: TButton
+    Left = 1244
+    Height = 24
+    Top = 568
+    Width = 32
+    Caption = '→'
+    TabOrder = 11
+    OnClick = RightScrollBtnClick
+  end
+  object ColNumberStringGrid: TStringGrid
+    Left = 856
+    Height = 24
+    Top = 128
+    Width = 430
+    Color = clMenu
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    GridLineStyle = psClear
+    RowCount = 1
+    ScrollBars = ssNone
+    TabOrder = 12
+  end
+  object CajaTB: TToggleBox
+    Left = 256
+    Height = 28
+    Top = 110
+    Width = 83
+    Caption = 'Box Plot'
+    TabOrder = 13
+    OnChange = CajaTBChange
+  end
+  object RowNumberStringGrid: TStringGrid
+    Left = 824
+    Height = 312
+    Top = 176
+    Width = 32
+    Color = clMenu
+    ColCount = 1
+    DefaultColWidth = 32
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    GridLineStyle = psClear
+    RowCount = 13
+    ScrollBars = ssNone
+    TabOrder = 14
+  end
+  object UpScrollBtn: TButton
+    Left = 1280
+    Height = 32
+    Top = 152
+    Width = 24
+    Caption = '↑'
+    TabOrder = 15
+    OnClick = UpScrollBtnClick
+  end
+  object DownScrollBtn: TButton
+    Left = 1280
+    Height = 32
+    Top = 456
+    Width = 24
+    Caption = '↓'
+    TabOrder = 16
+    OnClick = DownScrollBtnClick
+  end
+  object OpenDialog1: TOpenDialog
+    Filter = 'Data Filter|*.csv;*.txt'
+    Left = 784
+    Top = 88
+  end
+  object MainMenu1: TMainMenu
+    Left = 704
+    Top = 88
+    object MenuItem1: TMenuItem
+      Caption = 'Load File'
+      object CargarCSVMenuItem: TMenuItem
+        Caption = 'CSV'
+        OnClick = CargarCSVMenuItemClick
+      end
+    end
+  end
+end
