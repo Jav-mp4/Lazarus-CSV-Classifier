@@ -132,7 +132,7 @@ begin
   VertBarImage.Canvas.Brush.Color:=RGBToColor(226, 226, 226);
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color:=RGBToColor(226, 226, 226);
-  HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
+  HorzBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   DataChartLineSeries1.Clear;
   DataChartLineSeries1.Pointer.Style := psCircle;
   DataChartLineSeries1.Pointer.Brush.Color := Clred;

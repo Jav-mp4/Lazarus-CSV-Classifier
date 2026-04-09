@@ -1,19 +1,19 @@
 object Form1: TForm1
   Left = 429
-  Height = 606
+  Height = 576
   Top = 250
-  Width = 1329
-  Caption = 'Form1'
-  ClientHeight = 606
-  ClientWidth = 1329
+  Width = 1347
+  Caption = 'Classifier'
+  ClientHeight = 576
+  ClientWidth = 1347
   DesignTimePPI = 106
   Menu = MainMenu1
   LCLVersion = '4.4.0.0'
   OnCreate = FormCreate
-  object Chart1: TChart
-    Left = 16
-    Height = 448
-    Top = 144
+  object DataChart: TChart
+    Left = 24
+    Height = 445
+    Top = 88
     Width = 792
     AxisList = <    
       item
@@ -31,34 +31,36 @@ object Form1: TForm1
     Title.Text.Strings = (
       'TAChart'
     )
-    object Chart1LineSeries1: TLineSeries
+    Color = clMenu
+    object DataChartLineSeries1: TLineSeries
     end
-    object Chart1BarSeries1: TBarSeries
+    object DataChartBarSeries1: TBarSeries
       BarBrush.Color = clRed
     end
-    object Chart1BoxAndWhiskerSeries1: TBoxAndWhiskerSeries
+    object DataChartBoxAndWhiskerSeries1: TBoxAndWhiskerSeries
     end
   end
   object XColEdit: TEdit
-    Left = 48
+    Left = 56
     Height = 25
-    Top = 49
+    Top = 59
     Width = 30
     NumbersOnly = True
     TabOrder = 1
   end
   object YColEdit: TEdit
-    Left = 88
+    Left = 97
     Height = 25
-    Top = 49
+    Top = 59
     Width = 30
     NumbersOnly = True
     TabOrder = 2
   end
   object XYCOLlBtn: TButton
-    Left = 128
-    Height = 25
-    Top = 49
+    Cursor = crHandPoint
+    Left = 136
+    Height = 28
+    Top = 56
     Width = 64
     Caption = 'Confirm'
     TabOrder = 3
@@ -66,41 +68,44 @@ object Form1: TForm1
   end
   object ColRangeLabel: TLabel
     AnchorSideLeft.Side = asrBottom
-    Left = 100
+    Left = 1041
     Height = 17
-    Top = 33
-    Width = 7
-    Caption = '1'
+    Top = 536
+    Width = 21
+    Caption = '100'
   end
-  object Label1: TLabel
-    Left = 56
-    Height = 34
-    Top = 16
-    Width = 60
-    Caption = '  Column  '#13#10' 1   -'
+  object ColTitleLabel: TLabel
+    Left = 992
+    Height = 17
+    Top = 536
+    Width = 43
+    Caption = 'Colums'
   end
-  object DispersionTB: TToggleBox
-    Left = 48
+  object ScatterPlotTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 536
     Height = 28
-    Top = 110
+    Top = 56
     Width = 83
-    Caption = 'Dispersion'
+    Caption = 'Scatter Plot'
     TabOrder = 4
-    OnChange = DispersionTBChange
+    OnChange = ScatterPlotTBChange
   end
-  object BarrasTB: TToggleBox
-    Left = 152
+  object BarChartTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 632
     Height = 28
-    Top = 110
+    Top = 56
     Width = 83
-    Caption = 'Bar'
+    Caption = 'Bar Chart'
     TabOrder = 5
-    OnChange = BarrasTBChange
+    OnChange = BarChartTBChange
   end
   object ShowLineCheckBox: TCheckBox
-    Left = 48
+    Cursor = crHandPoint
+    Left = 536
     Height = 21
-    Top = 86
+    Top = 32
     Width = 48
     Caption = 'Lines'
     TabOrder = 6
@@ -108,9 +113,10 @@ object Form1: TForm1
     OnChange = ShowLineCheckBoxChange
   end
   object ClasesCheckBox: TCheckBox
-    Left = 152
+    Cursor = crHandPoint
+    Left = 632
     Height = 21
-    Top = 86
+    Top = 32
     Width = 62
     Caption = 'Classes'
     TabOrder = 7
@@ -120,26 +126,33 @@ object Form1: TForm1
   object DataStringGrid: TStringGrid
     Left = 856
     Height = 336
-    Top = 152
+    Top = 95
     Width = 420
+    Color = clDefault
     ColCount = 20
     DefaultColWidth = 70
     FixedCols = 0
+    FocusColor = clBlack
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 20
     ScrollBars = ssNone
     TabOrder = 8
-    OnAfterSelection = DataStringGridAfterSelection
+    OnPrepareCanvas = DataStringGridPrepareCanvas
+    OnSelection = DataStringGridSelection
   end
   object StatisticsStringGrid: TStringGrid
     Left = 856
     Height = 78
-    Top = 490
+    Top = 431
     Width = 420
     ColCount = 10
     DefaultColWidth = 70
     DefaultRowHeight = 26
     FixedCols = 0
     FixedRows = 0
+    FocusColor = clBlack
+    FocusRectVisible = False
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 3
     ScrollBars = ssNone
     TabOrder = 9
@@ -147,13 +160,13 @@ object Form1: TForm1
   object SymbolsImage: TImage
     Left = 1280
     Height = 78
-    Top = 490
+    Top = 431
     Width = 24
   end
   object LeftScrollBtn: TButton
     Left = 856
     Height = 24
-    Top = 568
+    Top = 511
     Width = 32
     Caption = '←'
     TabOrder = 10
@@ -162,7 +175,7 @@ object Form1: TForm1
   object RightScrollBtn: TButton
     Left = 1244
     Height = 24
-    Top = 568
+    Top = 511
     Width = 32
     Caption = '→'
     TabOrder = 11
@@ -171,30 +184,35 @@ object Form1: TForm1
   object ColNumberStringGrid: TStringGrid
     Left = 856
     Height = 24
-    Top = 128
+    Top = 71
     Width = 430
     Color = clMenu
     FixedCols = 0
     FixedRows = 0
     Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
     GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 1
     ScrollBars = ssNone
     TabOrder = 12
   end
-  object CajaTB: TToggleBox
-    Left = 256
+  object BoxPlotTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 728
     Height = 28
-    Top = 110
+    Top = 56
     Width = 83
     Caption = 'Box Plot'
     TabOrder = 13
-    OnChange = CajaTBChange
+    OnChange = BoxPlotTBChange
   end
   object RowNumberStringGrid: TStringGrid
+    Cursor = crHandPoint
     Left = 824
     Height = 312
-    Top = 176
+    Top = 119
     Width = 32
     Color = clMenu
     ColCount = 1
@@ -202,15 +220,21 @@ object Form1: TForm1
     FixedCols = 0
     FixedRows = 0
     Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineColor = clDefault
     GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 13
     ScrollBars = ssNone
     TabOrder = 14
+    OnPrepareCanvas = RowNumberStringGridPrepareCanvas
+    OnSelection = RowNumberStringGridSelection
   end
   object UpScrollBtn: TButton
     Left = 1280
     Height = 32
-    Top = 152
+    Top = 95
     Width = 24
     Caption = '↑'
     TabOrder = 15
@@ -219,25 +243,74 @@ object Form1: TForm1
   object DownScrollBtn: TButton
     Left = 1280
     Height = 32
-    Top = 456
+    Top = 399
     Width = 24
     Caption = '↓'
     TabOrder = 16
     OnClick = DownScrollBtnClick
   end
+  object RowOptionsBtn: TButton
+    Cursor = crHandPoint
+    Left = 1004
+    Height = 28
+    Top = 40
+    Width = 107
+    Caption = 'Add / Remove'
+    TabOrder = 17
+    OnClick = RowOptionsBtnClick
+  end
+  object VerticalBarlBtn: TButton
+    Left = 1280
+    Height = 12
+    Top = 127
+    Width = 24
+    TabOrder = 18
+  end
+  object RowRangeLabel: TLabel
+    Left = 1120
+    Height = 17
+    Top = 536
+    Width = 21
+    Caption = '100'
+  end
+  object RowTitleLabel: TLabel
+    Left = 1080
+    Height = 17
+    Top = 536
+    Width = 31
+    Caption = 'Rows'
+  end
+  object ClearDataBtn: TButton
+    Left = 24
+    Height = 28
+    Top = 536
+    Width = 83
+    Caption = 'ClearDataBtn'
+    TabOrder = 19
+    OnClick = ClearDataBtnClick
+  end
+  object VertBarImage: TImage
+    Left = 1280
+    Height = 274
+    Top = 127
+    Width = 24
+  end
+  object HorzBarImage: TImage
+    Left = 888
+    Height = 23
+    Top = 512
+    Width = 358
+  end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
-    Left = 784
-    Top = 88
   end
   object MainMenu1: TMainMenu
-    Left = 704
-    Top = 88
+    Left = 48
     object MenuItem1: TMenuItem
       Caption = 'Load File'
-      object CargarCSVMenuItem: TMenuItem
+      object LoadCSVMenuItem: TMenuItem
         Caption = 'CSV'
-        OnClick = CargarCSVMenuItemClick
+        OnClick = LoadCSVMenuItemClick
       end
     end
   end

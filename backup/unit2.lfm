@@ -1,0 +1,19 @@
+object RowOptForm: TRowOptForm
+  Left = 353
+  Height = 359
+  Top = 250
+  Width = 531
+  Caption = 'Row Options'
+  ClientHeight = 359
+  ClientWidth = 531
+  DesignTimePPI = 106
+  LCLVersion = '4.4.0.0'
+  object RowEdit: TEdit
+    Left = 248
+    Height = 25
+    Top = 152
+    Width = 40
+    TabOrder = 0
+    Text = '10'
+  end
+end
