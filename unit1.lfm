@@ -43,16 +43,18 @@ object Form1: TForm1
   object XColEdit: TEdit
     Left = 56
     Height = 25
-    Top = 59
+    Top = 56
     Width = 30
+    Alignment = taCenter
     NumbersOnly = True
     TabOrder = 1
   end
   object YColEdit: TEdit
-    Left = 97
+    Left = 96
     Height = 25
-    Top = 59
+    Top = 56
     Width = 30
+    Alignment = taCenter
     NumbersOnly = True
     TabOrder = 2
   end
@@ -68,18 +70,11 @@ object Form1: TForm1
   end
   object ColRangeLabel: TLabel
     AnchorSideLeft.Side = asrBottom
-    Left = 1041
-    Height = 17
-    Top = 536
-    Width = 21
-    Caption = '100'
-  end
-  object ColTitleLabel: TLabel
     Left = 992
     Height = 17
     Top = 536
-    Width = 43
-    Caption = 'Colums'
+    Width = 75
+    Caption = 'Columns 100'
   end
   object ScatterPlotTB: TToggleBox
     Cursor = crHandPoint
@@ -173,9 +168,9 @@ object Form1: TForm1
     OnClick = LeftScrollBtnClick
   end
   object RightScrollBtn: TButton
-    Left = 1244
+    Left = 1272
     Height = 24
-    Top = 511
+    Top = 509
     Width = 32
     Caption = '→'
     TabOrder = 11
@@ -249,15 +244,15 @@ object Form1: TForm1
     TabOrder = 16
     OnClick = DownScrollBtnClick
   end
-  object RowOptionsBtn: TButton
+  object DeleteRowBtn: TButton
     Cursor = crHandPoint
-    Left = 1004
+    Left = 896
     Height = 28
-    Top = 40
-    Width = 107
-    Caption = 'Add / Remove'
+    Top = 37
+    Width = 27
+    Caption = 'X'
     TabOrder = 17
-    OnClick = RowOptionsBtnClick
+    OnClick = DeleteRowBtnClick
   end
   object VerticalBarlBtn: TButton
     Left = 1280
@@ -267,18 +262,11 @@ object Form1: TForm1
     TabOrder = 18
   end
   object RowRangeLabel: TLabel
-    Left = 1120
+    Left = 1104
     Height = 17
     Top = 536
-    Width = 21
-    Caption = '100'
-  end
-  object RowTitleLabel: TLabel
-    Left = 1080
-    Height = 17
-    Top = 536
-    Width = 31
-    Caption = 'Rows'
+    Width = 56
+    Caption = 'Rows 100'
   end
   object ClearDataBtn: TButton
     Left = 24
@@ -299,13 +287,28 @@ object Form1: TForm1
     Left = 888
     Height = 23
     Top = 512
-    Width = 358
+    Width = 386
+  end
+  object CurrentRowEdit: TEdit
+    Left = 856
+    Height = 25
+    Top = 37
+    Width = 32
+    Alignment = taCenter
+    TabOrder = 20
+  end
+  object XYTitleLabel: TLabel
+    Left = 68
+    Height = 17
+    Top = 36
+    Width = 47
+    Caption = 'X        Y'
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
   end
   object MainMenu1: TMainMenu
-    Left = 48
+    Top = 56
     object MenuItem1: TMenuItem
       Caption = 'Load File'
       object LoadCSVMenuItem: TMenuItem
