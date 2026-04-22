@@ -61,7 +61,7 @@ object Form1: TForm1
   object XYCOLlBtn: TButton
     Cursor = crHandPoint
     Left = 136
-    Height = 28
+    Height = 26
     Top = 56
     Width = 64
     Caption = 'Confirm'
@@ -247,10 +247,10 @@ object Form1: TForm1
   object DeleteRowBtn: TButton
     Cursor = crHandPoint
     Left = 896
-    Height = 28
-    Top = 37
-    Width = 27
-    Caption = 'X'
+    Height = 26
+    Top = 40
+    Width = 48
+    Caption = 'Delete'
     TabOrder = 17
     OnClick = DeleteRowBtnClick
   end
@@ -292,7 +292,7 @@ object Form1: TForm1
   object CurrentRowEdit: TEdit
     Left = 856
     Height = 25
-    Top = 37
+    Top = 40
     Width = 32
     Alignment = taCenter
     TabOrder = 20
@@ -303,6 +303,15 @@ object Form1: TForm1
     Top = 36
     Width = 47
     Caption = 'X        Y'
+  end
+  object AddRowBtn: TButton
+    Left = 1215
+    Height = 26
+    Top = 40
+    Width = 59
+    Caption = 'Add'
+    TabOrder = 21
+    OnClick = AddRowBtnClick
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
