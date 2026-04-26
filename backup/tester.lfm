@@ -1,0 +1,9 @@
+object TesterForm: TTesterForm
+  Left = 353
+  Height = 240
+  Top = 250
+  Width = 320
+  Caption = 'Tester'
+  DesignTimePPI = 106
+  LCLVersion = '4.4.0.0'
+end

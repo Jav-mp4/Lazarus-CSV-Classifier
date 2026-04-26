@@ -1,0 +1,184 @@
+object TesterForm: TTesterForm
+  Left = 353
+  Height = 496
+  Top = 250
+  Width = 1114
+  Caption = 'Tester'
+  ClientHeight = 496
+  ClientWidth = 1114
+  DesignTimePPI = 106
+  LCLVersion = '4.4.0.0'
+  OnCreate = FormCreate
+  object ClassifierTypeCB: TComboBox
+    Left = 632
+    Height = 25
+    Top = 16
+    Width = 110
+    AutoSelect = False
+    ItemHeight = 17
+    ItemIndex = 0
+    Items.Strings = (
+      'Naive Bayes'
+    )
+    ReadOnly = True
+    Style = csDropDownList
+    TabOrder = 0
+    Text = 'Naive Bayes'
+  end
+  object AddTestDataBtn: TButton
+    Left = 963
+    Height = 26
+    Top = 48
+    Width = 91
+    Caption = 'Add Test Set'
+    TabOrder = 1
+    OnClick = AddTestDataBtnClick
+  end
+  object TestDataStringGrid: TStringGrid
+    Left = 634
+    Height = 336
+    Top = 104
+    Width = 350
+    Color = clDefault
+    ColCount = 20
+    DefaultColWidth = 70
+    FixedCols = 0
+    FocusColor = clBlack
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 20
+    ScrollBars = ssNone
+    TabOrder = 2
+    OnPrepareCanvas = TestDataStringGridPrepareCanvas
+    OnSelection = TestDataStringGridSelection
+  end
+  object ColNumberStringGrid: TStringGrid
+    Left = 634
+    Height = 24
+    Top = 80
+    Width = 350
+    Color = clMenu
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 1
+    ScrollBars = ssNone
+    TabOrder = 3
+  end
+  object UpScrollBtn: TButton
+    Left = 1056
+    Height = 32
+    Top = 104
+    Width = 24
+    Caption = '↑'
+    TabOrder = 4
+    OnClick = UpScrollBtnClick
+  end
+  object DownScrollBtn: TButton
+    Left = 1056
+    Height = 32
+    Top = 408
+    Width = 24
+    Caption = '↓'
+    TabOrder = 5
+    OnClick = DownScrollBtnClick
+  end
+  object TSTRightScrollBtn: TButton
+    Left = 1022
+    Height = 24
+    Top = 440
+    Width = 32
+    Caption = '→'
+    TabOrder = 6
+    OnClick = TSTRightScrollBtnClick
+  end
+  object HorzBarImage: TImage
+    Left = 648
+    Height = 23
+    Top = 440
+    Width = 386
+  end
+  object LeftScrollBtn: TButton
+    Left = 632
+    Height = 24
+    Top = 439
+    Width = 32
+    Caption = '←'
+    TabOrder = 7
+    OnClick = LeftScrollBtnClick
+  end
+  object VertBarImage: TImage
+    Left = 1056
+    Height = 274
+    Top = 136
+    Width = 24
+  end
+  object RowNumberStringGrid: TStringGrid
+    Cursor = crHandPoint
+    Left = 600
+    Height = 312
+    Top = 128
+    Width = 32
+    Color = clMenu
+    ColCount = 1
+    DefaultColWidth = 32
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineColor = clDefault
+    GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 20
+    ScrollBars = ssNone
+    TabOrder = 8
+    OnPrepareCanvas = RowNumberStringGridPrepareCanvas
+    OnSelection = RowNumberStringGridSelection
+  end
+  object ClassStringGrid: TStringGrid
+    Left = 984
+    Height = 336
+    Top = 104
+    Width = 70
+    ColCount = 1
+    DefaultColWidth = 70
+    FixedCols = 0
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 20
+    ScrollBars = ssNone
+    TabOrder = 9
+    OnPrepareCanvas = ClassStringGridPrepareCanvas
+    OnSelection = ClassStringGridSelection
+  end
+  object ColClassStringGrid1: TStringGrid
+    Left = 984
+    Height = 24
+    Top = 80
+    Width = 70
+    Color = clMenu
+    ColCount = 1
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 1
+    ScrollBars = ssNone
+    TabOrder = 10
+  end
+  object StartTestBtn: TButton
+    Left = 632
+    Height = 26
+    Top = 48
+    Width = 59
+    Caption = 'Test'
+    TabOrder = 11
+    OnClick = StartTestBtnClick
+  end
+end

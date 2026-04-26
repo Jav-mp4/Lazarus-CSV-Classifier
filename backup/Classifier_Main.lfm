@@ -1,0 +1,345 @@
+object Form1: TForm1
+  Left = 429
+  Height = 576
+  Top = 250
+  Width = 1347
+  Caption = 'Maximus Classifiersicus'
+  ClientHeight = 576
+  ClientWidth = 1347
+  DesignTimePPI = 106
+  Menu = MainMenu1
+  LCLVersion = '4.4.0.0'
+  OnCreate = FormCreate
+  object DataChart: TChart
+    Left = 24
+    Height = 445
+    Top = 88
+    Width = 792
+    AxisList = <    
+      item
+        Marks.LabelBrush.Style = bsClear
+        Minors = <>
+        Title.LabelFont.Orientation = 900
+        Title.LabelBrush.Style = bsClear
+      end    
+      item
+        Alignment = calBottom
+        Marks.LabelBrush.Style = bsClear
+        Minors = <>
+        Title.LabelBrush.Style = bsClear
+      end>
+    Title.Text.Strings = (
+      'TAChart'
+    )
+    Color = clMenu
+    object DataChartLineSeries1: TLineSeries
+    end
+    object DataChartBarSeries1: TBarSeries
+      BarBrush.Color = clRed
+    end
+    object DataChartBoxAndWhiskerSeries1: TBoxAndWhiskerSeries
+    end
+  end
+  object XColEdit: TEdit
+    Left = 56
+    Height = 25
+    Top = 56
+    Width = 30
+    Alignment = taCenter
+    NumbersOnly = True
+    TabOrder = 1
+  end
+  object YColEdit: TEdit
+    Left = 96
+    Height = 25
+    Top = 56
+    Width = 30
+    Alignment = taCenter
+    NumbersOnly = True
+    TabOrder = 2
+  end
+  object XYCOLlBtn: TButton
+    Cursor = crHandPoint
+    Left = 136
+    Height = 26
+    Top = 56
+    Width = 64
+    Caption = 'Confirm'
+    TabOrder = 3
+    OnClick = XYCOLlBtnClick
+  end
+  object ColRangeLabel: TLabel
+    AnchorSideLeft.Side = asrBottom
+    Left = 992
+    Height = 17
+    Top = 536
+    Width = 75
+    Caption = 'Columns 100'
+  end
+  object ScatterPlotTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 536
+    Height = 28
+    Top = 56
+    Width = 83
+    Caption = 'Scatter Plot'
+    TabOrder = 4
+    OnChange = ScatterPlotTBChange
+  end
+  object BarChartTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 632
+    Height = 28
+    Top = 56
+    Width = 83
+    Caption = 'Bar Chart'
+    TabOrder = 5
+    OnChange = BarChartTBChange
+  end
+  object ShowLineCheckBox: TCheckBox
+    Cursor = crHandPoint
+    Left = 536
+    Height = 21
+    Top = 32
+    Width = 48
+    Caption = 'Lines'
+    TabOrder = 6
+    Visible = False
+    OnChange = ShowLineCheckBoxChange
+  end
+  object ClasesCheckBox: TCheckBox
+    Cursor = crHandPoint
+    Left = 632
+    Height = 21
+    Top = 32
+    Width = 62
+    Caption = 'Classes'
+    TabOrder = 7
+    Visible = False
+    OnChange = ClasesCheckBoxChange
+  end
+  object DataStringGrid: TStringGrid
+    Left = 856
+    Height = 336
+    Top = 95
+    Width = 420
+    Color = clDefault
+    ColCount = 20
+    DefaultColWidth = 70
+    FixedCols = 0
+    FocusColor = clBlack
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 20
+    ScrollBars = ssNone
+    TabOrder = 8
+    OnPrepareCanvas = DataStringGridPrepareCanvas
+    OnSelection = DataStringGridSelection
+  end
+  object StatisticsStringGrid: TStringGrid
+    Left = 856
+    Height = 78
+    Top = 431
+    Width = 420
+    ColCount = 10
+    DefaultColWidth = 70
+    DefaultRowHeight = 26
+    FixedCols = 0
+    FixedRows = 0
+    FocusColor = clBlack
+    FocusRectVisible = False
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 3
+    ScrollBars = ssNone
+    TabOrder = 9
+  end
+  object SymbolsImage: TImage
+    Left = 1280
+    Height = 78
+    Top = 431
+    Width = 24
+  end
+  object LeftScrollBtn: TButton
+    Left = 856
+    Height = 24
+    Top = 511
+    Width = 32
+    Caption = '←'
+    TabOrder = 10
+    OnClick = LeftScrollBtnClick
+  end
+  object RightScrollBtn: TButton
+    Left = 1272
+    Height = 24
+    Top = 509
+    Width = 32
+    Caption = '→'
+    TabOrder = 11
+    OnClick = RightScrollBtnClick
+  end
+  object ColNumberStringGrid: TStringGrid
+    Left = 856
+    Height = 24
+    Top = 71
+    Width = 430
+    Color = clMenu
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 1
+    ScrollBars = ssNone
+    TabOrder = 12
+  end
+  object BoxPlotTB: TToggleBox
+    Cursor = crHandPoint
+    Left = 728
+    Height = 28
+    Top = 56
+    Width = 83
+    Caption = 'Box Plot'
+    TabOrder = 13
+    OnChange = BoxPlotTBChange
+  end
+  object RowNumberStringGrid: TStringGrid
+    Cursor = crHandPoint
+    Left = 824
+    Height = 312
+    Top = 119
+    Width = 32
+    Color = clMenu
+    ColCount = 1
+    DefaultColWidth = 32
+    FixedCols = 0
+    FixedRows = 0
+    Flat = True
+    FocusColor = clBlack
+    FocusRectVisible = False
+    GridLineColor = clDefault
+    GridLineStyle = psClear
+    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
+    RowCount = 13
+    ScrollBars = ssNone
+    TabOrder = 14
+    OnPrepareCanvas = RowNumberStringGridPrepareCanvas
+    OnSelection = RowNumberStringGridSelection
+  end
+  object UpScrollBtn: TButton
+    Left = 1280
+    Height = 32
+    Top = 95
+    Width = 24
+    Caption = '↑'
+    TabOrder = 15
+    OnClick = UpScrollBtnClick
+  end
+  object DownScrollBtn: TButton
+    Left = 1280
+    Height = 32
+    Top = 399
+    Width = 24
+    Caption = '↓'
+    TabOrder = 16
+    OnClick = DownScrollBtnClick
+  end
+  object DeleteRowBtn: TButton
+    Cursor = crHandPoint
+    Left = 896
+    Height = 26
+    Top = 40
+    Width = 48
+    Caption = 'Delete'
+    TabOrder = 17
+    OnClick = DeleteRowBtnClick
+  end
+  object VerticalBarlBtn: TButton
+    Left = 1280
+    Height = 12
+    Top = 127
+    Width = 24
+    TabOrder = 18
+  end
+  object RowRangeLabel: TLabel
+    Left = 1104
+    Height = 17
+    Top = 536
+    Width = 56
+    Caption = 'Rows 100'
+  end
+  object ClearDataBtn: TButton
+    Left = 24
+    Height = 28
+    Top = 536
+    Width = 83
+    Caption = 'ClearDataBtn'
+    TabOrder = 19
+    OnClick = ClearDataBtnClick
+  end
+  object VertBarImage: TImage
+    Left = 1280
+    Height = 274
+    Top = 127
+    Width = 24
+  end
+  object HorzBarImage: TImage
+    Left = 888
+    Height = 23
+    Top = 512
+    Width = 386
+  end
+  object CurrentRowEdit: TEdit
+    Left = 856
+    Height = 25
+    Top = 40
+    Width = 32
+    Alignment = taCenter
+    TabOrder = 20
+  end
+  object XYTitleLabel: TLabel
+    Left = 68
+    Height = 17
+    Top = 36
+    Width = 47
+    Caption = 'X        Y'
+  end
+  object AddRowBtn: TButton
+    Left = 1215
+    Height = 26
+    Top = 40
+    Width = 59
+    Caption = 'Add'
+    TabOrder = 21
+    OnClick = AddRowBtnClick
+  end
+  object ClassifierTypeCB: TComboBox
+    Left = 1160
+    Height = 25
+    Top = 8
+    Width = 110
+    AutoSelect = False
+    ItemHeight = 17
+    ItemIndex = 0
+    Items.Strings = (
+      'Naive Bayes'
+    )
+    ReadOnly = True
+    Style = csDropDownList
+    TabOrder = 22
+    Text = 'Naive Bayes'
+  end
+  object OpenDialog1: TOpenDialog
+    Filter = 'Data Filter|*.csv;*.txt'
+  end
+  object MainMenu1: TMainMenu
+    Top = 56
+    object MenuItem1: TMenuItem
+      Caption = 'Load File'
+      object LoadCSVMenuItem: TMenuItem
+        Caption = 'CSV'
+        OnClick = LoadCSVMenuItemClick
+      end
+    end
+  end
+end

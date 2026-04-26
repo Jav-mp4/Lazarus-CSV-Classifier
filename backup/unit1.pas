@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, Menus, StdCtrls, Grids,
   ExtCtrls, TAGraph, TASeries, TATypes, TAChartUtils,
-  TAMultiSeries, Math, Unit2;
+  TAMultiSeries, Math, Unit3;
 
 type
   TDoubleMatrix = array of array of double;
@@ -17,14 +17,16 @@ type
   { TForm1 }
 
   TForm1 = class(TForm)
+    AddRowBtn: TButton;
     ClearDataBtn: TButton;
+    ClassifierTypeCB: TComboBox;
+    CurrentRowEdit: TEdit;
     HorzBarImage: TImage;
     VertBarImage: TImage;
-    Label1: TLabel;
+    XYTitleLabel: TLabel;
     RowRangeLabel: TLabel;
-    RowTitleLabel: TLabel;
     VerticalBarlBtn: TButton;
-    RowOptionsBtn: TButton;
+    DeleteRowBtn: TButton;
     DownScrollBtn: TButton;
     UpScrollBtn: TButton;
     DataChartBoxAndWhiskerSeries1: TBoxAndWhiskerSeries;
@@ -38,7 +40,6 @@ type
     SymbolsImage: TImage;
     ShowLineCheckBox: TCheckBox;
     ColRangeLabel: TLabel;
-    ColTitleLabel: TLabel;
     ScatterPlotTB: TToggleBox;
     BarChartTB: TToggleBox;
     StatisticsStringGrid: TStringGrid;
@@ -52,17 +53,22 @@ type
     MenuItem1: TMenuItem;
     LoadCSVMenuItem: TMenuItem;
     OpenDialog1: TOpenDialog;
+    procedure AddRowBtnClick(Sender: TObject);
     procedure BoxPlotTBChange(Sender: TObject);
     procedure ClearDataBtnClick(Sender: TObject);
-    procedure DataStringGridPrepareCanvas(Sender: TObject; aCol, aRow: Integer;
-      aState: TGridDrawState);
-    procedure DataStringGridSelection(Sender: TObject; aCol, aRow: Integer);
-    procedure LoadCSVFile(root: string);
+    procedure DataStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
+    procedure DataStringGridSelection(Sender: TObject; aCol, aRow: integer);
+
 
     //Funciones
+    function LoadCSVFileToMatrix(root: string): TDoubleMatrix;
+    procedure LoadMainData(doubleMatrix: TDoubleMatrix);
+    procedure LoadNewRows(doubleMatrix: TDoubleMatrix);
     procedure GenerateScatterPlot();
     procedure GenerateBarChart();
+    procedure GetStats();
     procedure ClearData();
+    procedure DeleteRow();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
     procedure RowNumberStringGridSelection(Sender: TObject; aCol, aRow: integer);
     procedure SortColumn(colIndex: integer);
@@ -70,16 +76,15 @@ type
     function IsInsideRange(index: integer; range: integer): boolean;
     function SortedMatrixToArray(colIndex: integer): TDoubleArray;
     function SortedMatrixRealValue(i, j: integer): double;
-    function GetMean(colIndex: integer): double;
-    function GetMedian(sortedArray: TDoubleArray): double;
-    function GetStandarDev(colIndex: integer; mean: double): double;
+    function GetMean(doubleArray: TDoubleArray): double;
+    function GetMedian(sortedDoubleArray: TDoubleArray): double;
+    function GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
     function Discretization(colIndex: integer): TDoubleMatrix;
     function RandomRGB(RMin, RMax, GMin, GMax, BMin, BMax: integer): TColor;
 
     //Eventos
-    procedure RowNumberStringGridPrepareCanvas(Sender: TObject;
-      aCol, aRow: integer; aState: TGridDrawState);
-    procedure RowOptionsBtnClick(Sender: TObject);
+    procedure RowNumberStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
+    procedure DeleteRowBtnClick(Sender: TObject);
     procedure DownScrollBtnClick(Sender: TObject);
     procedure LeftScrollBtnClick(Sender: TObject);
     procedure UpdateDataChart();
@@ -119,8 +124,6 @@ implementation
 
 //-------------------------- Valores de inicio ------------------------------//
 procedure TForm1.FormCreate(Sender: TObject);
-var
-  back_color: TColor;
 begin
      {back_color:=RGBToColor(250, 250, 250);
      Form1.Color:=back_color;
@@ -129,10 +132,10 @@ begin
      DataChart.Color:=back_color;}
 
   SELECTEDROW := -1;
-  VertBarImage.Canvas.Brush.Color:=RGBToColor(226, 226, 226);
+  VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
-  HorzBarImage.Canvas.Brush.Color:=RGBToColor(226, 226, 226);
-  HorzBarImage.Canvas.FillRect(VertBarImage.ClientRect);
+  HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+  HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
   DataChartLineSeries1.Clear;
   DataChartLineSeries1.Pointer.Style := psCircle;
   DataChartLineSeries1.Pointer.Brush.Color := Clred;
@@ -146,66 +149,42 @@ begin
   XCOLINDEX := 0;
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadCSVFile('data_sets\ST2_test_short_1.txt');
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
 end;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>FUNCIONES>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
 
-//------------------------Cargar Archivo-----------------------------//
-procedure TForm1.LoadCSVFile(root: string);
+//-------Cargar archivo CSV y devolverlo como matriz de tipo Double------//
+function TForm1.LoadCSVFileToMatrix(root: string): TDoubleMatrix;
 var
-  i, j, c, file_colsize, file_rowsize: integer;
+  doubleMatrix: TDoubleMatrix;
+  c, row, col, mtxRowLength, mtxColLength: integer;
   txt_line, txt_number: string;
   full_file: TextFile;
 begin
-
-  try
+  try 
     try
       AssignFile(full_file, root);
+      //Se posiciona al principio de la primera fila
       Reset(full_file);
-      //Se reserva espacio para las columnas
-      SetLength(DATATAG, 100);
-      DataStringGrid.Clean;
-      DataStringGrid.ColCount := 100;
-      DataStringGrid.rowCount := 1;
-      file_colsize := 0;
-      //Leemos la primera linea para obtener las etiquetas
-      ReadLn(full_file, txt_line);
+      //Se reserva espacio
+      mtxRowLength := 500;
+      mtxColLength := 100;
+      SetLength(doubleMatrix, mtxRowLength, mtxColLength);
+
+      //Se agregan los valores
       txt_number := '';
-      for c := 1 to Length(txt_line) do
-      begin
-        if (txt_line[c] = ',') or (c = Length(txt_line)) then
-        begin
-          if (c = Length(txt_line)) then
-            txt_number += txt_line[c];
-          //Se aumenta tamaño si se rebaso el tamaño reservado en el inicio
-          if (file_colsize + 1 > Length(DATATAG)) then
-            SetLength(DATATAG, file_colsize + 100);
-          DataStringGrid.ColCount := file_colsize + 100;
-          DATATAG[file_colsize] := StrToInt(txt_number);
-          DataStringGrid.Cells[file_colsize, 0] := txt_number;
-          file_colsize += 1;
-          txt_number := '';
-        end
-        else
-          txt_number += txt_line[c];
-      end;
-
-      //Asigna espacio real de columnas
-      SetLength(DATATAG, file_colsize);
-      DataStringGrid.ColCount := file_colsize;
-
-      //Se Reserva espacio para las filas
-      SetLength(DATAMATRIX, 500, file_colsize);
-      SetLength(CLASSARRAY, 500);
-      DataStringGrid.RowCount := 500;
-      file_rowsize := 1;
-
-      //Se agregan los demas valores
+      row := 0;
       while not EOF(full_file) do
       begin
         ReadLn(full_file, txt_line);
-        j := 0;
+        //Se checa que no se exceda tamaño de filas
+        if (row + 1 > mtxRowLength) then
+        begin
+          mtxRowLength += 100;
+          SetLength(doubleMatrix, mtxRowLength);
+        end;
+        col := 0;
         for c := 1 to Length(txt_line) do
         begin
           if (txt_line[c] = ',') or (c = Length(txt_line)) then
@@ -213,97 +192,42 @@ begin
             if (c = Length(txt_line)) then
               txt_number += txt_line[c];
             //Se aumenta tamaño si se rebaso el tamaño reservado en el inicio
-            if (file_rowsize + 1 > Length(DATAMATRIX)) then
-              SetLength(DATAMATRIX, file_rowsize + 100);
+            if (col + 1 > mtxColLength) then
+            begin
+              mtxColLength += 100;
+              SetLength(doubleMatrix, mtxRowLength, mtxColLength);
+            end;
             //Si es la ultima columna se asigna el valor en CLASSMATRIX de lo contrario se asigna a DATAMATRIX
-            if (j + 1 < file_colsize) then
-              DATAMATRIX[file_rowsize - 1, j] :=
-                StrToFloat(txt_number)
-            else
-              CLASSARRAY[file_rowsize - 1] :=
-                StrToInt(txt_number);
-            DataStringGrid.Cells[j, file_rowsize] :=
-              txt_number;
-            j += 1;
+            doubleMatrix[row, col] := StrToFloat(txt_number);
+            col += 1;
             txt_number := '';
           end
           else
             txt_number += txt_line[c];
         end;
-        file_rowsize += 1;
+        row += 1;
       end;
-      SetLength(DATAMATRIX, file_rowsize);
-      SetLength(CLASSARRAY, file_rowsize);
-      DataStringGrid.RowCount := file_rowsize;
-
-      DMCOLSIZE := file_colsize - 1;//Tamaño sin la primera fila
-      DMROWSIZE := file_rowsize - 1;//Tamaño sin la ultima columna
-      SetLength(STATSMATRIX, 3, DMCOLSIZE);
-      SetLength(SORTEDMATRIX, DMROWSIZE, DMCOLSIZE);
-
-      StatisticsStringGrid.Clean;
-      ColNumberStringGrid.Clean;
-      RowNumberStringGrid.Clean;
-      StatisticsStringGrid.RowCount := 3;
-      StatisticsStringGrid.ColCount := DMCOLSIZE + 1;
-      ColNumberStringGrid.RowCount := 1;
-      ColNumberStringGrid.ColCount := DMCOLSIZE + 1;
-      RowNumberStringGrid.ColCount := 1;
-      RowNumberStringGrid.RowCount := DMROWSIZE;
-
-      ColNumberStringGrid.LeftCol := 0;
-      RowNumberStringGrid.LeftCol := 0;
-      DataStringGrid.LeftCol := 0;
-      StatisticsStringGrid.LeftCol := 0;
-
-      //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
-      for j := 0 to DMCOLSIZE - 1 do
-        ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
-      ColNumberStringGrid.Cells[DMCOLSIZE, 0] := 'Class';
-      for i := 0 to DMROWSIZE - 1 do
-        RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
-
-      //Agregar -1 a toda la primera fila de SORTEDMATRIX para indicar que no estan ordenadas
-      for j := 0 to DMCOLSIZE - 1 do
-        SORTEDMATRIX[0, j] := -1;
-
-      //Obtiene los valores Media,Mediana y Desviacion para cada columna
-      for j := 0 to DMCOLSIZE - 1 do
-      begin
-        if (DATATAG[j] = 0) then
-        begin
-          STATSMATRIX[0, j] := GetMean(j);
-          StatisticsStringGrid.Cells[j, 0] :=
-            FloatToStr(Round(STATSMATRIX[0, j] * 100) / 100);
-          STATSMATRIX[1, j] := GetMedian(SortedMatrixToArray(j));
-          StatisticsStringGrid.Cells[j, 1] :=
-            FloatToStr(STATSMATRIX[1, j]);
-          STATSMATRIX[2, j] := GetStandarDev(j, STATSMATRIX[0, j]);
-          StatisticsStringGrid.Cells[j, 2] :=
-            FloatToStr(Round(STATSMATRIX[2, j] * 100) / 100);
-        end;
-      end;
-      //Toma el valor de la primera fila para utilizar en el Chart
-      XCOLINDEX := 0;
-      YCOLINDEX := 0;
-      SELECTEDROW := 0;
-      XColEdit.Text := IntToStr(XCOLINDEX + 1);
-      YColEdit.Text := IntToStr(YCOLINDEX + 1);
-      ColRangeLabel.Caption := IntToStr(DMCOLSIZE);
-      RowRangeLabel.Caption := IntToStr(DMROWSIZE);
-
-      XYCOLlBtn.Enabled:=True;
-      ScatterPlotTB.Enabled:=True;
-      BarChartTB.Enabled:=True;
-      BoxPlotTB.Enabled:=True;
-      RowOptionsBtn.Enabled:=True;
+      SetLength(doubleMatrix, row, col);
+      Result := doubleMatrix;
     except
       On e1: EFOpenError do
+      begin
+         setlength(doubleMatrix, 0, 0);
+         result := doubleMatrix;
         ShowMessage(e1.Message);
+      end;
       On e2: EConvertError do
+      begin
+         setlength(doubleMatrix, 0, 0);
+         result := doubleMatrix;
         ShowMessage('Caracteres encontrados en espacio de datos numericos');
+      end;
       On e3: EAccessViolation do
+         begin
+         setlength(doubleMatrix, 0, 0);
+         result := doubleMatrix;
         ShowMessage(e3.Message);
+         end;
     end;
   finally
     CloseFile(full_file);
@@ -311,7 +235,116 @@ begin
 end;
 
 
+//------------------------Cargar Archivo Principal -----------------------------//
+procedure TForm1.LoadMainData(doubleMatrix: TDoubleMatrix);
+var
+  i, j: integer;
+begin
+  try
 
+  DMROWSIZE := Length(doubleMatrix) - 1;
+  DMCOLSIZE := Length(doubleMatrix[0]) - 1;
+  SetLength(DATATAG, DMCOLSIZE + 1);
+  SetLength(DATAMATRIX, DMROWSIZE, DMCOLSIZE);
+  SetLength(CLASSARRAY, DMROWSIZE);
+  DataStringGrid.Clean;
+  DataStringGrid.ColCount := DMCOLSIZE + 1;
+  DataStringGrid.rowCount := DMROWSIZE + 1;
+  //Se obtienen los datos de las etiquetas
+  for j := 0 to DMCOLSIZE do
+  begin
+    DATATAG[j] := Round(doubleMatrix[0, j]);
+    DataStringGrid.Cells[j, 0] := FloatToStr(doubleMatrix[0, j]);
+  end;
+  //Se obtienen los datos de cada ejemplo
+  //Se empieza por i := 1 para ignorar primer fila
+  for i := 0 to DMROWSIZE - 1 do
+  begin
+    for j := 0 to DMCOLSIZE - 1 do
+    begin
+      DATAMATRIX[i, j] := doubleMatrix[i + 1, j];
+      DataStringGrid.Cells[j, i + 1] := FloatToStr(doubleMatrix[i + 1, j]);
+    end;
+  end;
+  //Se obtienen los valores de clase de la ultima columna en cada fila DMCOLSIZE es equivalente a ultimo indice de doublematrix
+  for i := 0 to DMROWSIZE - 1 do
+  begin
+    CLASSARRAY[i] := Round(doubleMatrix[i + 1, DMCOLSIZE]);
+    DataStringGrid.Cells[DMCOLSIZE, i + 1] := FloatToStr(doubleMatrix[i + 1, DMCOLSIZE]);
+  end;
+
+
+  SetLength(STATSMATRIX, 3, DMCOLSIZE);
+  SetLength(SORTEDMATRIX, DMROWSIZE, DMCOLSIZE);
+
+  StatisticsStringGrid.Clean;
+  ColNumberStringGrid.Clean;
+  RowNumberStringGrid.Clean;
+  StatisticsStringGrid.RowCount := 3;
+  StatisticsStringGrid.ColCount := DMCOLSIZE + 1;
+  ColNumberStringGrid.RowCount := 1;
+  ColNumberStringGrid.ColCount := DMCOLSIZE + 1;
+  RowNumberStringGrid.ColCount := 1;
+  RowNumberStringGrid.RowCount := DMROWSIZE;
+
+  ColNumberStringGrid.LeftCol := 0;
+  RowNumberStringGrid.LeftCol := 0;
+  DataStringGrid.LeftCol := 0;
+  StatisticsStringGrid.LeftCol := 0;
+
+  //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
+  for j := 0 to DMCOLSIZE - 1 do
+    ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
+  ColNumberStringGrid.Cells[DMCOLSIZE, 0] := 'Class';
+  for i := 0 to DMROWSIZE - 1 do
+    RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
+
+  //Agregar -1 a toda la primera fila de SORTEDMATRIX para indicar que no estan ordenadas
+  for j := 0 to DMCOLSIZE - 1 do
+    SORTEDMATRIX[0, j] := -1;
+
+  //Obtiene los valores Media,Mediana y Desviacion para cada columna
+  GetStats();
+  //Toma el valor de la primera fila para utilizar en el Chart
+  XCOLINDEX := 0;
+  YCOLINDEX := 0;
+  SELECTEDROW := 0;
+  XColEdit.Text := IntToStr(XCOLINDEX + 1);
+  YColEdit.Text := IntToStr(YCOLINDEX + 1);
+  ColRangeLabel.Caption := 'Columns ' + IntToStr(DMCOLSIZE);
+  RowRangeLabel.Caption := 'Rows ' + IntToStr(DMROWSIZE);
+
+  XYCOLlBtn.Enabled := True;
+  ScatterPlotTB.Enabled := True;
+  BarChartTB.Enabled := True;
+  BoxPlotTB.Enabled := True;
+  DeleteRowBtn.Enabled := True;
+  CURRENTGRAPH := 'SCATTERPLOT';
+  UpdateDataChart();
+  except
+        On e: ERangeError do
+        //ShowMessage(e.Message);
+  end;
+end;
+
+procedure TForm1.GetStats();
+var
+  i, j:Integer;
+begin
+  //Obtiene los valores Media,Mediana y Desviacion para cada columna
+  for j := 0 to DMCOLSIZE - 1 do
+  begin
+    if (DATATAG[j] = 0) then
+    begin
+      STATSMATRIX[0, j] := GetMean(SortedMatrixToArray(j));
+      StatisticsStringGrid.Cells[j, 0] := FloatToStr(Round(STATSMATRIX[0, j] * 100) / 100);
+      STATSMATRIX[1, j] := GetMedian(SortedMatrixToArray(j));
+      StatisticsStringGrid.Cells[j, 1] := FloatToStr(STATSMATRIX[1, j]);
+      STATSMATRIX[2, j] := GetStandarDev(SortedMatrixToArray(j), STATSMATRIX[0, j]);
+      StatisticsStringGrid.Cells[j, 2] := FloatToStr(Round(STATSMATRIX[2, j] * 100) / 100);
+    end;
+  end;
+end;
 //-------------------Actualizar grafica y cambiar tipo---------------//
 procedure TForm1.UpdateDataChart();
 var
@@ -322,9 +355,9 @@ begin
   DataChartBoxAndWhiskerSeries1.Clear;
   case CURRENTGRAPH of
     'NONE':
-           begin
-                ClearData();
-           end;
+    begin
+         ClearData();
+    end;
     'SCATTERPLOT':
       GenerateScatterPlot();
     'BARCHART':
@@ -356,16 +389,15 @@ begin
     if not (DATATAG[XCOLINDEX] = 0) then
       SortColumn(XCOLINDEX);
     for i := 0 to DMROWSIZE - 1 do
-      DataChartLineSeries1.AddXY(SortedMatrixRealValue(
-        i, XCOLINDEX), DATAMATRIX[SORTEDMATRIX[i, XCOLINDEX], YCOLINDEX], '',
+      DataChartLineSeries1.AddXY(SortedMatrixRealValue(i, XCOLINDEX),
+        DATAMATRIX[SORTEDMATRIX[i, XCOLINDEX], YCOLINDEX], '',
         RandomRGB(60, 90, 60, 140, 150, 150));
   end
   else
   begin
     DataChartLineSeries1.ShowLines := False;
     for i := 0 to DMROWSIZE - 1 do
-      DataChartLineSeries1.AddXY(DATAMATRIX[i, XCOLINDEX],
-        DATAMATRIX[i, YCOLINDEX], '', RandomRGB(60, 90, 60, 140, 150, 150));
+      DataChartLineSeries1.AddXY(DATAMATRIX[i, XCOLINDEX], DATAMATRIX[i, YCOLINDEX], '', RandomRGB(60, 90, 60, 140, 150, 150));
   end;
 
 end;
@@ -426,21 +458,18 @@ begin
       begin
         for j := 0 to intervalNum - 1 do
         begin
-          if ((fieldsDoubleMatrix[j, 0] - intervalWidth) <=
-            SortedMatrixRealValue(i, XCOLINDEX)) and (SortedMatrixRealValue(i, XCOLINDEX) <
-            fieldsDoubleMatrix[j, 0]) then
+          if ((fieldsDoubleMatrix[j, 0] - intervalWidth) <= SortedMatrixRealValue(i, XCOLINDEX)) and
+            (SortedMatrixRealValue(i, XCOLINDEX) < fieldsDoubleMatrix[j, 0]) then
           begin
             fieldsDoubleMatrix[j, 1] += 1;
           end;
-
         end;
       end;
 
       for j := 0 to intervalNum - 1 do
-        DataChartBarSeries1.AddXY(fieldsDoubleMatrix[j, 0] -
-          (intervalWidth / 2), fieldsDoubleMatrix[j, 1], FloatToStr(Round(
-          (fieldsDoubleMatrix[j, 0] - intervalWidth) * 100) / 100) + '-' + FloatToStr(
-          Round(fieldsDoubleMatrix[j, 0] * 100) / 100), RandomRGB(60, 90, 60, 140, 150, 150));
+        DataChartBarSeries1.AddXY(fieldsDoubleMatrix[j, 0] - (intervalWidth / 2), fieldsDoubleMatrix[j, 1],
+          FloatToStr(Round((fieldsDoubleMatrix[j, 0] - intervalWidth) * 100) / 100) + '-' + FloatToStr(Round(fieldsDoubleMatrix[j, 0] * 100) / 100),
+          RandomRGB(60, 90, 60, 140, 150, 150));
     end
     else
     begin
@@ -457,7 +486,8 @@ begin
       end;
       for j := 0 to Length(fieldsIntArray) - 1 do
         DataChartBarSeries1.AddXY(
-          j, fieldsIntArray[j], IntToStr(j), RandomRGB(60, 90, 60, 140, 150, 150));
+          j, fieldsIntArray[j], IntToStr(j),
+          RandomRGB(60, 90, 60, 140, 150, 150));
     end;
   end;
 end;
@@ -511,33 +541,33 @@ end;
 //-------------------------Limpiar Datos-------------------------------//
 procedure TForm1.ClearData();
 begin
-     SetLength(DATAMATRIX,0,0);
-     SetLength(STATSMATRIX,0,0);
-     SetLength(SORTEDMATRIX,0,0);
-     SetLength(DATATAG,0);
-     SetLength(CLASSARRAY,0);
-     DMROWSIZE := -1;
-     DMCOLSIZE := -1;
-     XCOLINDEX := -1;
-     YCOLINDEX := -1;
-     SELECTEDROW := -1;
+  SetLength(DATAMATRIX, 0, 0);
+  SetLength(STATSMATRIX, 0, 0);
+  SetLength(SORTEDMATRIX, 0, 0);
+  SetLength(DATATAG, 0);
+  SetLength(CLASSARRAY, 0);
+  DMROWSIZE := -1;
+  DMCOLSIZE := -1;
+  XCOLINDEX := -1;
+  YCOLINDEX := -1;
+  SELECTEDROW := -1;
 
-     XYCOLlBtn.Enabled:=False;
+  XYCOLlBtn.Enabled := False;
 
-     ScatterPlotTB.Checked:=False;
-     ScatterPlotTB.Enabled:=False;
+  ScatterPlotTB.Checked := False;
+  ScatterPlotTB.Enabled := False;
 
-     BarChartTB.Checked:=False;
-     BarChartTB.Enabled:=False;
+  BarChartTB.Checked := False;
+  BarChartTB.Enabled := False;
 
-     BoxPlotTB.Checked:=False;
-     BoxPlotTB.Enabled:=False;
-     RowOptionsBtn.Enabled:=False;
+  BoxPlotTB.Checked := False;
+  BoxPlotTB.Enabled := False;
+  DeleteRowBtn.Enabled := False;
 
-     DataStringGrid.Clear;
-     RowNumberStringGrid.Clear;
-     ColNumberStringGrid.Clear;
-     StatisticsStringGrid.Clear;
+  DataStringGrid.Clear;
+  RowNumberStringGrid.Clear;
+  ColNumberStringGrid.Clear;
+  StatisticsStringGrid.Clear;
 end;
 
 
@@ -585,8 +615,7 @@ begin
   end;
   for i := 0 to intervalNum - 1 do
   begin
-    if (newArray[i, 0] <= DATAMATRIX[i, colIndex]) and
-      (DATAMATRIX[i, colIndex] > newArray[i, 0] + intervalWidth) then
+    if (newArray[i, 0] <= DATAMATRIX[i, colIndex]) and (DATAMATRIX[i, colIndex] > newArray[i, 0] + intervalWidth) then
       newArray[i, 1] += 1;
   end;
   Result := newArray;
@@ -606,8 +635,7 @@ begin
     begin
       for k := 0 to DMROWSIZE - 2 - i do
       begin
-        if (DATAMATRIX[(SORTEDMATRIX[k, colIndex]), colIndex] >
-          DATAMATRIX[(SORTEDMATRIX[k + 1, colIndex]), colIndex]) then
+        if (DATAMATRIX[(SORTEDMATRIX[k, colIndex]), colIndex] > DATAMATRIX[(SORTEDMATRIX[k + 1, colIndex]), colIndex]) then
         begin
           temp := SORTEDMATRIX[k, colIndex];
           SORTEDMATRIX[k, colIndex] :=
@@ -623,53 +651,52 @@ end;
 
 
 //Obtener la Media de una columna
-function TForm1.GetMean(colIndex: integer): double;
+function TForm1.GetMean(doubleArray: TDoubleArray): double;
 var
   i: integer;
   mean: double;
 begin
   mean := 0;
-  for i := 0 to DMROWSIZE - 1 do
+  for i := 0 to Length(doubleArray) - 1 do
   begin
-    mean += DATAMATRIX[i, colIndex];
+    mean += doubleArray[i];
   end;
-  mean := mean / DMROWSIZE;
+  mean := mean / Length(doubleArray);
   Result := mean;
 end;
 
 //Obtener la Mediana de un TDoubleArray
-function TForm1.GetMedian(sortedArray: TDoubleArray): double;
+function TForm1.GetMedian(sortedDoubleArray: TDoubleArray): double;
 var
   rowSize: integer;
 begin
-  rowSize := Length(sortedArray) - 1;
+  rowSize := Length(sortedDoubleArray) - 1;
   //Se da el tamaño real en cuanto a los indices del arreglo para facilitar operaciones
   if (rowSize + 1 mod 2 = 0) then //Se compara cantidad de datos
-    Result := (sortedArray[rowSize div 2] + sortedArray[(rowSize div 2) + 1]) / 2
+    Result := (sortedDoubleArray[rowSize div 2] + sortedDoubleArray[(rowSize div 2) + 1]) / 2
 
   else
-    Result := sortedArray[(rowSize + 1) div 2];
+    Result := sortedDoubleArray[(rowSize + 1) div 2];
 end;
 
 //Obtener la desviacion estandar
-function TForm1.GetStandarDev(colIndex: integer; mean: double): double;
+function TForm1.GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
 var
   deviation: double;
   i: integer;
 begin
   deviation := 0;
-  for i := 0 to DMROWSIZE - 1 do
+  for i := 0 to Length(doubleArray) - 1 do
   begin
-    deviation += Power((DATAMATRIX[i, colIndex] - mean), 2);
+    deviation += Power((doubleArray[i] - mean), 2);
   end;
-  deviation := Sqrt(deviation / DMROWSIZE);
+  deviation := Sqrt(deviation / Length(doubleArray));
   Result := deviation;
 end;
 
 function TForm1.RandomRGB(RMin, RMax, GMin, GMax, BMin, BMax: integer): TColor;
 begin
-  Result := RGBToColor(Random(RMax - RMin) + RMin, Random(GMax - GMin) + GMin,
-    Random(BMax - BMin) + BMin);
+  Result := RGBToColor(Random(RMax - RMin) + RMin, Random(GMax - GMin) + GMin, Random(BMax - BMin) + BMin);
 end;
 
 procedure TForm1.DataStringPositionChange();
@@ -679,14 +706,90 @@ begin
   RowNumberStringGrid.TopRow := DataStringGrid.TopRow - 1;
   if (DMROWSIZE > 13) then
     VerticalBarlBtn.Top :=
-      Round(((DownScrollBtn.Top) - (UpScrollBtn.Top + UpScrollBtn.Height)) *
-      ((DataStringGrid.TopRow) / (DMROWSIZE - 12))) +
+      Round(((DownScrollBtn.Top) - (UpScrollBtn.Top + UpScrollBtn.Height)) * ((DataStringGrid.TopRow) / (DMROWSIZE - 12))) +
       UpScrollBtn.Top + UpScrollBtn.Height - VerticalBarlBtn.Height;
 end;
 
+//Borrar una fila
+procedure TForm1.DeleteRow();
+var
+  rowToDelete, i, j: integer;
+  rowWasFound: boolean;
+begin
+  try
+    //Se comprueba que el indice exista
+    if (IsInsideRange(StrToInt(CurrentRowEdit.Text), DMROWSIZE)) then
+    begin
+      rowToDelete := StrToInt(CurrentRowEdit.Text) - 1;
+      //A partir de la fila que se quiere eliminar se desplazan todas un indice hacia atras
+      for i := rowToDelete to DMROWSIZE - 2 do
+      begin
+        for j := 0 to DMCOLSIZE - 1 do
+        begin
+          DATAMATRIX[i, j] := DATAMATRIX[i + 1, j];
+          DataStringGrid.Cells[j, i + 1] := DataStringGrid.Cells[j, i + 2];
+        end;
+        //Se hace lo mismo con la columna de clase
+        CLASSARRAY[i] := CLASSARRAY[i + 1];
+        DataStringGrid.Cells[DataStringGrid.ColCount-1, i + 1] := DataStringGrid.Cells[DataStringGrid.ColCount-1, i + 2];
+      end;
+
+      //Se actualizan los indices en SORTEDMATRIX (la matriz con idices ordenados)
+      for j := 0 to DMCOLSIZE - 1 do
+      begin
+        rowWasFound := False;
+        for i := 0 to DMROWSIZE - 2 do
+        begin
+          //A partir de encontrarse con la fila eliminada comenzara a desplazar los valores de la columna hacia una fila anterior
+          if (rowWasFound or (rowToDelete = SORTEDMATRIX[i, j])) then
+            if (rowWasFound) then
+              SORTEDMATRIX[i, j] := SORTEDMATRIX[i + 1, j]
+            else
+              begin
+                rowWasFound := True;
+                SORTEDMATRIX[i, j] := SORTEDMATRIX[i + 1, j];
+              end;
+          //Si les resta 1 a los indices que eran mas grandes que la fila eliminada para ajustarlos a el nuevo limite
+          if (SORTEDMATRIX[i, j] > rowToDelete) then
+             SORTEDMATRIX[i, j] := SORTEDMATRIX[i, j]-1;
+        end;
+      end;
 
 
+      DMROWSIZE := DMROWSIZE - 1;
+      SetLength(DATAMATRIX, DMROWSIZE);
+      SetLength(SORTEDMATRIX, DMROWSIZE);
+      RowNumberStringGrid.RowCount := RowNumberStringGrid.RowCount - 1;
+      DataStringGrid.RowCount := DataStringGrid.RowCount - 1;
+      UpdateDataChart();
+      if (DMROWSIZE>0) then
+         GetStats()
+      else
+        begin
+          CURRENTGRAPH:='NONE';
+          ClearData();
+        end;
+    end
+    else
+      raise ERangeError.Create('invalid index');
+  except
+    on e1: EConvertError do
+      ShowMessage(e1.Message);
+    on e2: ERangeError do
+      ShowMessage(e2.Message);
+  end;
+end;
 
+
+procedure TForm1.LoadNewRows(doubleMatrix: TDoubleMatrix);
+begin
+  case ClassifierTypeCB.Text of
+    'Naive Bayes':
+      showmessage('naive');
+    'other':
+      showmessage('naive');
+  end;
+end;
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FUNCIONES<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
 
 
@@ -694,50 +797,53 @@ end;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>EVENTOS>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
 
-//Seleccion de Fila
+
+
+procedure TForm1.DeleteRowBtnClick(Sender: TObject);
+begin
+  DeleteRow();
+end;
+
+//Seleccion de Fila y coloreado de celdas
 procedure TForm1.RowNumberStringGridSelection(Sender: TObject; aCol, aRow: integer);
 begin
   SELECTEDROW := RowNumberStringGrid.Row;
-  RowOptForm.RowEdit.Text:=IntToStr(SELECTEDROW+1);
+  CurrentRowEdit.Text := IntToStr(SELECTEDROW + 1);
   //DataStringGrid.TopRow:=RowNumberStringGrid.TopRow+1;
   DataStringGrid.Invalidate;
   RowNumberStringGrid.Invalidate;
 
 end;
 
-procedure TForm1.RowNumberStringGridPrepareCanvas(Sender: TObject;
-  aCol, aRow: integer; aState: TGridDrawState);
+procedure TForm1.RowNumberStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
 begin
   if (aRow = SELECTEDROW) then
-     RowNumberStringGrid.Canvas.Brush.Color := RGBToColor(198, 198, 198);
+    RowNumberStringGrid.Canvas.Brush.Color := RGBToColor(198, 198, 198);
 end;
 
 
-procedure TForm1.DataStringGridPrepareCanvas(Sender: TObject; aCol,
-  aRow: Integer; aState: TGridDrawState);
+procedure TForm1.DataStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
 begin
-     if (aRow = SELECTEDROW+1) then
-        DataStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+  if (aRow = SELECTEDROW + 1) then
+    DataStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
 end;
 
-
-
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!//
-
-
-procedure TForm1.RowOptionsBtnClick(Sender: TObject);
-begin
-  RowOptForm.Show;
-end;
 
 procedure TForm1.LoadCSVMenuItemClick(Sender: TObject);
+var
+  doubleMatrix: TDoubleMatrix;
 begin
   try
     OpenDialog1.Execute;
-    LoadCSVFile(OpenDialog1.FileName);
+    doubleMatrix := LoadCSVFileToMatrix(OpenDialog1.FileName);
+    if(length(doubleMatrix) = 0) then
+    raise ERangeError.Create('');
+    LoadMainData(doubleMatrix);
   except
-    On e3: EAccessViolation do
-      ShowMessage(e3.Message);
+    On e1: EInOutError do
+      ShowMessage(e1.Message);
+    On e2: ERangeError do
+      //ShowMessage(e2.Message);
   end;
 end;
 
@@ -747,9 +853,13 @@ end;
 //Actualizacion de StringGrids con respecto a posicion de DataStringGrid
 
 
-procedure TForm1.DataStringGridSelection(Sender: TObject; aCol, aRow: Integer);
+procedure TForm1.DataStringGridSelection(Sender: TObject; aCol, aRow: integer);
 begin
-     DataStringPositionChange();
+  DataStringPositionChange();
+  SELECTEDROW := DataStringGrid.Row-1;
+  CurrentRowEdit.Text := IntToStr(SELECTEDROW + 1);
+  DataStringGrid.Invalidate;
+  RowNumberStringGrid.Invalidate;
 end;
 
 
@@ -897,12 +1007,30 @@ begin
   end;
 end;
 
+procedure TForm1.AddRowBtnClick(Sender: TObject);
+var
+  doubleMatrix: TDoubleMatrix;
+begin
+  try
+    OpenDialog1.Execute;
+    doubleMatrix := LoadCSVFileToMatrix(OpenDialog1.FileName);
+    if(length(doubleMatrix) = 0) then
+    raise ERangeError.Create('');
+    LoadNewRows(doubleMatrix);
+  except
+    On e1: EInOutError do
+      ShowMessage(e1.Message);
+    On e2: ERangeError do
+      //ShowMessage(e2.Message);
+  end;
+end;
+
 
 
 procedure TForm1.ClearDataBtnClick(Sender: TObject);
 begin
-     CURRENTGRAPH:='NONE';
-     UpdateDataChart();
+  CURRENTGRAPH := 'NONE';
+  UpdateDataChart();
 end;
 
 
@@ -931,15 +1059,14 @@ begin
       begin
         x := StrToInt(XColEdit.Text);
         y := StrToInt(YColEdit.Text);
-        if (IsInsideRange(x, DMCOLSIZE)) and
-          (IsInsideRange(y, DMCOLSIZE)) then
+        if (IsInsideRange(x, DMCOLSIZE)) and (IsInsideRange(y, DMCOLSIZE)) then
         begin
           XCOLINDEX := x - 1;
           YCOLINDEX := y - 1;
           UpdateDataChart();
         end
         else
-          raise EConvertError.Create('invalid range');
+          raise ERangeError.Create('invalid index');
       end;
       'BARCHART':
       begin
@@ -952,7 +1079,7 @@ begin
             UpdateDataChart();
           end
           else
-            raise EConvertError.Create('invalid range');
+            raise ERangeError.Create('invalid index');
         end;
       end;
       'BOXPLOT':
@@ -961,9 +1088,15 @@ begin
       end;
     end;
   except
-    On e: EConvertError do
+    On e1: EConvertError do
     begin
-      ShowMessage(e.Message);
+      ShowMessage(e1.Message);
+      XColEdit.Text := IntToStr(XCOLINDEX + 1);
+      YColEdit.Text := IntToStr(YCOLINDEX + 1);
+    end;
+    On e2: ERangeError do
+    begin
+      ShowMessage(e2.Message);
       XColEdit.Text := IntToStr(XCOLINDEX + 1);
       YColEdit.Text := IntToStr(YCOLINDEX + 1);
     end;
@@ -974,3 +1107,5 @@ end;
 
 end.
 
+
+// CTRL+D Format
