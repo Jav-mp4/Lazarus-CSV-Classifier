@@ -43,7 +43,7 @@
         <ComponentName Value="Form1"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <UnitName Value="Unit1"/>
+        <UnitName Value="Classifier_Main"/>
       </Unit>
       <Unit>
         <Filename Value="unit2.pas"/>
@@ -52,6 +52,18 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="Unit2"/>
+      </Unit>
+      <Unit>
+        <Filename Value="tester.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="TesterForm"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="TesterUnit"/>
+      </Unit>
+      <Unit>
+        <Filename Value="typesunit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TypesUnit"/>
       </Unit>
     </Units>
   </ProjectOptions>
