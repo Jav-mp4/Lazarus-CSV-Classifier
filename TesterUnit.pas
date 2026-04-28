@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, Grids,
-  ExtCtrls, TAGraph, TypesUnit;
+  ExtCtrls, TAGraph, Math, TypesUnit;
 
 type
 
@@ -35,6 +35,8 @@ type
     procedure CheckExistingRows();
     procedure BeginTesting();
     procedure ClearTestData();
+    function ApplyNaiveBayes(rowIndex: Integer): Integer;
+    function SelectProbableClass(totalCProb: TDoubleArray): Integer;
 
     //Eventos
     procedure FormCreate(Sender: TObject);
@@ -70,6 +72,18 @@ uses
   {$R *.lfm}
 
   { TTesterForm }
+
+
+//Valores de inicio
+procedure TTesterForm.FormCreate(Sender: TObject);
+begin
+  VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+  VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
+  HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+  HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
+  LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  UpdateTestVisual();
+end;
 
 //Obtener datos de prueba de un TDoubleMatrix
 procedure TTesterForm.LoadTesterData(doubleMatrix: TDoubleMatrix);
@@ -166,13 +180,124 @@ begin
 end;
 
 procedure TTesterForm.BeginTesting();
+var
+  i: integer;
 begin
+      {for i := 0 to Length(TMCLASSARRAY) - 1 do
+        ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSARRAY[i]);}//Mostrar Clase obtenida en StringGrid
+  CheckExistingRows();
   case ClassifierTypeCB.Text of
     'Naive Bayes':
-      ShowMessage('naive');
+    begin
+      for i := 0 to TMROWSIZE - 1 do
+      begin
+        //Se aplica el algoritmo para todos los elementos nuevos
+        if (TMCLASSARRAY[i] = -1) then
+          TMCLASSARRAY[i] := ApplyNaiveBayes(i);
+        ClassStringGrid.Cells[0,i+1] := IntToStr(TMCLASSARRAY[i]);
+      end;
+    end;
     'other':
-      ShowMessage('naive');
+      ShowMessage('other');
   end;
+end;
+
+//Aplica el algoritmo Naive Bayes para encontrar la clase
+function TTesterForm.ApplyNaiveBayes(rowIndex: integer): Integer;
+var
+  //C = Clase
+  i, j, currentC, totalC, sameValueNum: integer;
+  cMatchIndex: array of integer;
+  totalCProb, ColCProb, cElements: TDoubleArray;
+  mean, deviation: double;
+begin
+  totalC := TMDATATAG[Length(TMDATATAG) - 1];
+  //Areglo del procentaje total de cada clase
+  SetLength(totalCProb, totalC);
+  //Arreglo del porcentaje en cada columna para la clase actual
+  SetLength(ColCProb, TMCOLSIZE);
+  ////Recorre todas las clases
+  for currentC := 0 to totalC - 1 do
+  begin
+    //Encuentra los indices que son de la clase siendo evaluada actualmente
+    SetLength(cMatchIndex, 0);
+    for i := 0 to MainUnit.DMROWSIZE - 1 do
+    begin
+      if (MainUnit.CLASSARRAY[i] = currentC) then
+      begin
+        SetLength(cMatchIndex, Length(cMatchIndex) + 1);
+        cMatchIndex[Length(cMatchIndex) - 1] := i;
+      end;
+    end;
+    //Recorre todas las columnas
+    for j := 0 to TMCOLSIZE - 1 do
+    begin
+      //Evaluacion si la columna es de tipo Continuo
+      if (TMDATATAG[j] = 0) then
+      begin
+        //Se obtienen todos los elementos de esta columna que pertenecen a la clase currentC
+        SetLength(cElements, 0);
+        for i := 0 to Length(cMatchIndex) - 1 do
+        begin
+            SetLength(cElements, Length(cElements) + 1);
+            cElements[Length(cElements) - 1] := MainUnit.DATAMATRIX[cMatchIndex[i], j];
+        end;
+        //Si hay por lo menos un elemento que pertenece a la clase se evalua
+        if not (Length(cElements) = 0) then
+        begin
+          mean := MainForm.GetMean(cElements);
+          deviation := MainForm.GetStandarDev(cElements, mean);
+          //Se evita error si la desviacion estandar es igual a 0
+          if(deviation = 0)then
+            deviation := 1e-8;
+          try
+            ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((TESTMATRIX[rowIndex, j] - mean), 2) / (2 * Power(deviation, 2))));
+          except
+            on e1: EDivByZero do
+              ShowMessage(e1.Message);
+          end;
+        end;
+      end
+      //Evaluacion si la columna es de tipo Nominal
+      else
+      begin
+        sameValueNum := 0;
+        for i := 0 to Length(cMatchIndex) - 1 do
+        begin
+            if ( MainUnit.DATAMATRIX[cMatchIndex[i], j] = TESTMATRIX[rowIndex, j]) then
+               begin
+               sameValueNum += 1;
+               end;
+        end;
+        ColCProb[j] := sameValueNum / Length(cMatchIndex);
+      //Si el valor es 0 se le asigna 1e-4 para evitar que anule los demas al multiplicar
+      end;
+      if (ColCProb[j] = 0) then
+          ColCProb[j] := 1e-4;
+    end;
+    //Se agrega valor neutro de multiplicacion
+    totalCProb[currentC] := 1;
+    //Se obtiene la probabilidad conjunta de todas las probabilidades de atributo
+    for j := 0 to TMCOLSIZE - 1 do
+    begin
+      totalCProb[currentC] := totalCProb[currentC] * ColCProb[j];
+      //Si el valor es demasiado pequeño se regresa a el limite de 1e-200 para que el programa no lo convierta en 0
+      if (totalCProb[currentC] < 1e-308) then
+          totalCProb[currentC] := 1e-308;
+    end;
+  end;
+  result := SelectProbableClass(totalCProb);
+end;
+
+function TtesterForm.SelectProbableClass(totalCProb: TDoubleArray): Integer;
+var
+  i, chosenC: Integer;
+begin
+  chosenC := 0;
+  for i:= 0 to Length(totalCProb)-1 do
+      if(totalCProb[i] > totalCProb[chosenC]) then
+         chosenC := i;
+  result := chosenC;
 end;
 
 procedure TTesterForm.CheckExistingRows();
@@ -218,31 +343,17 @@ procedure TTesterForm.UpdateTestVisual();
 var
   i: integer;
 begin
-
-  case CURRENTTESTSET of
-    'NONE':
-    begin
-      ClassifierTypeCB.Enabled := False;
-      StartTestBtn.Enabled := False;
-      ClearTestData();
-    end;
-    'HAS_CLASS':
-    begin
-      ClassifierTypeCB.Enabled := True;
-      StartTestBtn.Enabled := True;
-      CheckExistingRows();
-      for i := 0 to Length(TMCLASSARRAY) - 1 do
-        ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSARRAY[i]);
-    end;
-    'NO_CLASS':
-    begin
-      ClassifierTypeCB.Enabled := True;
-      StartTestBtn.Enabled := True;
-      CheckExistingRows();
-      for i := 0 to Length(TMCLASSARRAY) - 1 do
-        ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSARRAY[i]);
-
-    end;
+  //Si no hay se elige NONE se borran todos los datos y se limpian los StringGrid
+  if (CURRENTTESTSET = 'NONE') then
+  begin
+    ClassifierTypeCB.Enabled := False;
+    StartTestBtn.Enabled := False;
+    ClearTestData();
+  end
+  else
+  begin
+    ClassifierTypeCB.Enabled := True;
+    StartTestBtn.Enabled := True;
   end;
 end;
 
@@ -279,7 +390,7 @@ end;
 
 procedure TTesterForm.StartTestBtnClick(Sender: TObject);
 begin
-  UpdateTestVisual();
+  BeginTesting();
 end;
 
 procedure TTesterForm.ClassStringGridSelection(Sender: TObject; aCol,
@@ -291,15 +402,7 @@ begin
   ClassStringGrid.Invalidate;
 end;
 
-procedure TTesterForm.FormCreate(Sender: TObject);
-begin
-  VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
-  VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
-  HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
-  HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
-  CURRENTTESTSET:= 'NONE';
-  UpdateTestVisual();
-end;
+
 
 procedure TTesterForm.TestDataStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
 begin
