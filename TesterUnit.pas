@@ -14,7 +14,10 @@ type
 
   TTesterForm = class(TForm)
     AddTestDataBtn: TButton;
-    StartTestBtn: TButton;
+    Chart1: TChart;
+    EvaluateBtn: TButton;
+    EvaluationTypeCB: TComboBox;
+    ClassificationBtn: TButton;
     ClassifierTypeCB: TComboBox;
     ColNumberStringGrid: TStringGrid;
     ColClassStringGrid1: TStringGrid;
@@ -28,15 +31,19 @@ type
     UpScrollBtn: TButton;
     VertBarImage: TImage;
     //Funciones
-    procedure StartTestBtnClick(Sender: TObject);
+    procedure EvaluateBtnClick(Sender: TObject);
+    procedure ClassificationBtnClick(Sender: TObject);
     procedure UpdateTestVisual();
     procedure LoadTesterData(doubleMatrix: TDoubleMatrix);
     procedure DataStringPositionChange();
     procedure CheckExistingRows();
-    procedure BeginTesting();
+    procedure ClassifyTestSet();
+    procedure EvaluateClassifier();
     procedure ClearTestData();
-    function ApplyNaiveBayes(rowIndex: Integer): Integer;
-    function SelectProbableClass(totalCProb: TDoubleArray): Integer;
+    procedure UpdateStringGrids();
+    function ApplyNaiveBayes(rowIndex: integer): Integer;
+    function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
+
 
     //Eventos
     procedure FormCreate(Sender: TObject);
@@ -59,9 +66,9 @@ type
 
 var
   TesterForm: TTesterForm;
-  TESTMATRIX: TDoubleMatrix;
-  TMDATATAG, TMCLASSARRAY, TMREALCLASSARRAY: array of integer;
-  TMSELECTEDROW, TMROWSIZE, TMCOLSIZE: integer;
+  TMCLASSPERCENT, TESTMATRIX: TDoubleMatrix;
+  TMCLASSRESULTS, TMREALCLASS: array of integer;
+  TMSELECTEDROW, TMROWSIZE, TMCOLSIZE, IGNORESTART, IGNOREEND: integer;
   CURRENTTESTSET: String;
 
 implementation
@@ -77,6 +84,7 @@ uses
 //Valores de inicio
 procedure TTesterForm.FormCreate(Sender: TObject);
 begin
+  CURRENTTESTSET := 'NONE';
   VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
@@ -107,71 +115,46 @@ begin
       begin
         if not (DATATAG[MainUnit.DMCOLSIZE] = doubleMatrix[0, MainUnit.DMCOLSIZE]) then
           raise EConvertError.Create('');
-        //Se llenan los valores reales de clase en TMREALCLASSARRAY
-        ClassStringGrid.Clean;
-        SetLength(TMREALCLASSARRAY, Length(doubleMatrix) - 1);
-        ClassStringGrid.rowCount := Length(doubleMatrix) + 1;
-        for i := 0 to Length(TMREALCLASSARRAY) - 1 do
+        //Se llenan los valores reales de clase en TMREALCLASS
+        SetLength(TMREALCLASS, Length(doubleMatrix) - 1);
+        for i := 0 to Length(TMREALCLASS) - 1 do
         begin
-          TMREALCLASSARRAY[i] := Round(doubleMatrix[i + 1, MainUnit.DMCOLSIZE]);
-          //ClassStringGrid.Cells[0, i + 1] := IntToStr(TMREALCLASSARRAY[i]); //Para probar la clase en TMREALCLASSARRAY
+          TMREALCLASS[i] := Round(doubleMatrix[i + 1, MainUnit.DMCOLSIZE]);
+          //ClassStringGrid.Cells[0, i + 1] := IntToStr(TMREALCLASS[i]); //Para probar la clase en TMREALCLASS
         end;
         CURRENTTESTSET:= 'HAS_CLASS';
       end
       //Valores que depended si no tiene clase
       else
       begin
-        ClassStringGrid.Clean;
-        SetLength(TMREALCLASSARRAY, 1);
-        TMREALCLASSARRAY[0] := -1;
+        SetLength(TMREALCLASS, 1);
+        TMREALCLASS[0] := -1;
         CURRENTTESTSET:= 'NO_CLASS';
       end;
-      //Se asigna como no revisado para cuando pase a CheckExistingRows()
-      for i:= 0 to Length(TMCLASSARRAY)-1 do
-          TMCLASSARRAY[i] := -2;
+      {//Se asigna como no revisado para cuando pase a CheckExistingRows()
+      for i:= 0 to Length(TMCLASSRESULTS)-1 do
+          TMCLASSRESULTS[i] := -2;}
       //Tamaño sin columna de etiquetas
       TMROWSIZE := Length(doubleMatrix) - 1;
       TMCOLSIZE := MainUnit.DMCOLSIZE;
-      TMDATATAG := MainUnit.DATATAG;
       //Se asignan tamaños a matrizes de datos
       SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
-      SetLength(TMCLASSARRAY, TMROWSIZE);
-      TestDataStringGrid.Clean;
-      TestDataStringGrid.ColCount := TMCOLSIZE;
-      TestDataStringGrid.rowCount := TMROWSIZE + 1;
-      ClassStringGrid.rowCount := TMROWSIZE + 1;
-      //Se muestran etiquetas en StringGrid
-      for j := 0 to TMCOLSIZE-1 do
-      begin
-        TestDataStringGrid.Cells[j, 0] := IntToStr(TMDATATAG[j]);
-      end;
-      ClassStringGrid.Cells[0, 0] := IntToStr(TMDATATAG[TMCOLSIZE]);
-      //Se agregan los datos a TESTMATRIX y al StringGrid
+      SetLength(TMCLASSRESULTS, TMROWSIZE);
+
+      //Se agregan los datos a TESTMATRIX
       for i := 0 to TMROWSIZE - 1 do
       begin
         for j := 0 to TMCOLSIZE - 1 do
         begin
           TESTMATRIX[i, j] := doubleMatrix[i + 1, j];
-          TestDataStringGrid.Cells[j, i + 1] := FloatToStr(doubleMatrix[i + 1, j]);
         end;
       end;
-      //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
-      ColNumberStringGrid.ColCount := TMCOLSIZE;
-      RowNumberStringGrid.RowCount := TMROWSIZE;
-      ColNumberStringGrid.LeftCol := 0;
-      RowNumberStringGrid.LeftCol := 0;
-      TestDataStringGrid.LeftCol := 0;
-      for j := 0 to TMCOLSIZE - 1 do
-        ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
-      ColClassStringGrid1.ColCount := 1;
-      ColClassStringGrid1.Cells[0,0] := 'Class';
-      for i := 0 to TMROWSIZE - 1 do
-        RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
+      //Se actualiza la parte visual
+      UpdateStringGrids();
       UpdateTestVisual();
     end
     else
       raise EConvertError.Create('');
-
   except
     //Si la estructura del TestSet no corresponde con el DataSet original
     On e1: EConvertError do
@@ -179,22 +162,96 @@ begin
   end;
 end;
 
-procedure TTesterForm.BeginTesting();
+procedure TTesterForm.UpdateStringGrids();
+var
+  i, j: integer;
+begin
+  TestDataStringGrid.Clean;
+  ClassStringGrid.Clean;
+  TestDataStringGrid.ColCount := TMCOLSIZE;
+  TestDataStringGrid.rowCount := TMROWSIZE + 1;
+  ClassStringGrid.rowCount := TMROWSIZE + 1;
+  //Se muestran etiquetas en TestDataStringGrid
+  ClassStringGrid.Cells[0, 0] := IntToStr(MainUnit.DATATAG[TMCOLSIZE]);
+  for j := 0 to TMCOLSIZE - 1 do
+  begin
+    TestDataStringGrid.Cells[j, 0] := IntToStr(MainUnit.DATATAG[j]);
+  end;
+  //Se muestran datos en TestDataStringGrid;
+  for i := 0 to TMROWSIZE - 1 do
+  begin
+    for j := 0 to TMCOLSIZE - 1 do
+    begin
+      TestDataStringGrid.Cells[j, i + 1] := FloatToStr(TESTMATRIX[i, j]);
+    end;
+  end;
+  //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
+  ColNumberStringGrid.ColCount := TMCOLSIZE;
+  RowNumberStringGrid.RowCount := TMROWSIZE;
+  ColNumberStringGrid.LeftCol := 0;
+  RowNumberStringGrid.LeftCol := 0;
+  TestDataStringGrid.LeftCol := 0;
+  for j := 0 to TMCOLSIZE - 1 do
+    ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
+  ColClassStringGrid1.ColCount := 1;
+  ColClassStringGrid1.Cells[0, 0] := 'Class';
+  for i := 0 to TMROWSIZE - 1 do
+    RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
+end;
+
+
+procedure TTesterForm.ClassifyTestSet();
 var
   i: integer;
 begin
-      {for i := 0 to Length(TMCLASSARRAY) - 1 do
-        ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSARRAY[i]);}//Mostrar Clase obtenida en StringGrid
-  CheckExistingRows();
   case ClassifierTypeCB.Text of
     'Naive Bayes':
     begin
+      SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1]);
       for i := 0 to TMROWSIZE - 1 do
       begin
-        //Se aplica el algoritmo para todos los elementos nuevos
-        if (TMCLASSARRAY[i] = -1) then
-          TMCLASSARRAY[i] := ApplyNaiveBayes(i);
-        ClassStringGrid.Cells[0,i+1] := IntToStr(TMCLASSARRAY[i]);
+        //Se aplica el algoritmo para todos los elementos
+        TMCLASSRESULTS[i] := ApplyNaiveBayes(i);
+        ClassStringGrid.Cells[0,i+1] := IntToStr(TMCLASSRESULTS[i]);
+      end;
+
+    end;
+    'other':
+      ShowMessage('other');
+  end;
+end;
+
+procedure TTesterForm.EvaluateClassifier();
+var
+  i, j, f, folds: Integer;
+begin
+  folds := 5;
+  case EvaluationTypeCB.Text of
+    'K-Fold':
+    begin
+      //Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
+      TMROWSIZE := (MainUnit.DMROWSIZE div folds);
+      TMCOLSIZE := MainUnit.DMCOLSIZE;
+      //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
+      SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
+      for f := 1 to folds do
+      begin
+        IGNORESTART := (TMROWSIZE * f)-TMROWSIZE;
+        IGNOREEND := (TMROWSIZE * f)-1;
+        for i := 0 to TMROWSIZE - 1 do
+          for j := 0 to TMCOLSIZE - 1 do
+            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART+i, j];
+      //Se asignan los valores reales de clase en TMREALCLASS
+      SetLength(TMREALCLASS, TMROWSIZE);
+      SetLength(TMCLASSRESULTS, TMROWSIZE);
+      for i := 0 to TMROWSIZE - 1 do
+        TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
+      //Se asigna tamaño a TMCLASSPERCENT
+      SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
+      //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
+      UpdateStringGrids();
+      ClassifyTestSet();
+      showmessage(' ');
       end;
     end;
     'other':
@@ -209,9 +266,9 @@ var
   i, j, currentC, totalC, sameValueNum: integer;
   cMatchIndex: array of integer;
   totalCProb, ColCProb, cElements: TDoubleArray;
-  mean, deviation: double;
+  mean, deviation, cProbInDM: double;
 begin
-  totalC := TMDATATAG[Length(TMDATATAG) - 1];
+  totalC := MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1];
   //Areglo del procentaje total de cada clase
   SetLength(totalCProb, totalC);
   //Arreglo del porcentaje en cada columna para la clase actual
@@ -221,7 +278,7 @@ begin
   begin
     //Encuentra los indices que son de la clase siendo evaluada actualmente
     SetLength(cMatchIndex, 0);
-    for i := 0 to MainUnit.DMROWSIZE - 1 do
+    for i := 0 to MainUnit.DMROWSIZE-1 do
     begin
       if (MainUnit.CLASSARRAY[i] = currentC) then
       begin
@@ -233,7 +290,7 @@ begin
     for j := 0 to TMCOLSIZE - 1 do
     begin
       //Evaluacion si la columna es de tipo Continuo
-      if (TMDATATAG[j] = 0) then
+      if (MainUnit.DATATAG[j] = 0) then
       begin
         //Se obtienen todos los elementos de esta columna que pertenecen a la clase currentC
         SetLength(cElements, 0);
@@ -249,7 +306,7 @@ begin
           deviation := MainForm.GetStandarDev(cElements, mean);
           //Se evita error si la desviacion estandar es igual a 0
           if(deviation = 0)then
-            deviation := 1e-8;
+            deviation := 1e-308;
           try
             ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((TESTMATRIX[rowIndex, j] - mean), 2) / (2 * Power(deviation, 2))));
           except
@@ -269,11 +326,14 @@ begin
                sameValueNum += 1;
                end;
         end;
-        ColCProb[j] := sameValueNum / Length(cMatchIndex);
+        if (Length(cMatchIndex) = 0) then
+          ColCProb[j] := 0
+        else
+          ColCProb[j] := sameValueNum / Length(cMatchIndex);
       //Si el valor es 0 se le asigna 1e-4 para evitar que anule los demas al multiplicar
       end;
       if (ColCProb[j] = 0) then
-          ColCProb[j] := 1e-4;
+          ColCProb[j] := 1e-308;
     end;
     //Se agrega valor neutro de multiplicacion
     totalCProb[currentC] := 1;
@@ -285,11 +345,18 @@ begin
       if (totalCProb[currentC] < 1e-308) then
           totalCProb[currentC] := 1e-308;
     end;
+    //Se multiplica por la probabilidad de clase
+    cProbInDM := 0;
+    for i := 0 to MainUnit.DMROWSIZE-1 do
+      if (MainUnit.CLASSARRAY[i] = currentC) then
+        cProbInDM += 1;
+    cProbInDM := cProbInDM / Length(MainUnit.CLASSARRAY);
+    totalCProb[currentC] := totalCProb[currentC] * cProbInDM;
   end;
-  result := SelectProbableClass(totalCProb);
+  result := SelectMaxProbClass(totalCProb);
 end;
 
-function TtesterForm.SelectProbableClass(totalCProb: TDoubleArray): Integer;
+function TtesterForm.SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
 var
   i, chosenC: Integer;
 begin
@@ -327,7 +394,7 @@ begin
         //Si ya existe el ejemplo se le asigna la clase que le corresponde de lo contrario se marca con -1
         if (rowExists) then
         begin
-          TMCLASSARRAY[k] := MainUnit.CLASSARRAY[i];
+          TMCLASSRESULTS[k] := MainUnit.CLASSARRAY[i];
           found[k] := True;
         end;
       end;
@@ -335,7 +402,7 @@ begin
   end;
   for k := 0 to TMROWSIZE - 1 do
     if not (found[k]) then
-      TMCLASSARRAY[k] := -1;
+      TMCLASSRESULTS[k] := -1;
 end;
 
 
@@ -346,24 +413,21 @@ begin
   //Si no hay se elige NONE se borran todos los datos y se limpian los StringGrid
   if (CURRENTTESTSET = 'NONE') then
   begin
-    ClassifierTypeCB.Enabled := False;
-    StartTestBtn.Enabled := False;
     ClearTestData();
   end
   else
   begin
     ClassifierTypeCB.Enabled := True;
-    StartTestBtn.Enabled := True;
+    ClassificationBtn.Enabled := True;
   end;
 end;
 
 procedure TTesterForm.ClearTestData();
 begin
   SetLength(TESTMATRIX, 0, 0);
-  SetLength(TMDATATAG, 0);
-  SetLength(TMCLASSARRAY, 0);
-  SetLength(TMREALCLASSARRAY, 1);
-  TMREALCLASSARRAY[1] := -1;
+  SetLength(TMCLASSRESULTS, 0);
+  SetLength(TMREALCLASS, 1);
+  TMREALCLASS[1] := -1;
   TMROWSIZE := 0;
   TMCOLSIZE := 0;
   TestDataStringGrid.Clear;
@@ -371,6 +435,8 @@ begin
   ColNumberStringGrid.Clear;
   ClassStringGrid.Clear;
   ColClassStringGrid1.Clear;
+  ClassifierTypeCB.Enabled := False;
+  ClassificationBtn.Enabled := False;
 end;
 
 procedure TTesterForm.DataStringPositionChange();
@@ -388,9 +454,14 @@ end;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>EVENTOS>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
 
 
-procedure TTesterForm.StartTestBtnClick(Sender: TObject);
+procedure TTesterForm.ClassificationBtnClick(Sender: TObject);
 begin
-  BeginTesting();
+  ClassifyTestSet();
+end;
+
+procedure TTesterForm.EvaluateBtnClick(Sender: TObject);
+begin
+  EvaluateClassifier();
 end;
 
 procedure TTesterForm.ClassStringGridSelection(Sender: TObject; aCol,

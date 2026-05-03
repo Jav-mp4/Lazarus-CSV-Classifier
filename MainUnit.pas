@@ -19,7 +19,6 @@ type
     HorzBarImage: TImage;
     VertBarImage: TImage;
     XYTitleLabel: TLabel;
-    RowRangeLabel: TLabel;
     VerticalBarlBtn: TButton;
     DeleteRowBtn: TButton;
     DownScrollBtn: TButton;
@@ -34,7 +33,7 @@ type
     RowNumberStringGrid: TStringGrid;
     SymbolsImage: TImage;
     ShowLineCheckBox: TCheckBox;
-    ColRangeLabel: TLabel;
+    DMSize: TLabel;
     ScatterPlotTB: TToggleBox;
     BarChartTB: TToggleBox;
     StatisticsStringGrid: TStringGrid;
@@ -305,8 +304,7 @@ begin
   SELECTEDROW := 0;
   XColEdit.Text := IntToStr(XCOLINDEX + 1);
   YColEdit.Text := IntToStr(YCOLINDEX + 1);
-  ColRangeLabel.Caption := 'Columns ' + IntToStr(DMCOLSIZE);
-  RowRangeLabel.Caption := 'Rows ' + IntToStr(DMROWSIZE);
+  DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
 
   XYCOLlBtn.Enabled := True;
   ScatterPlotTB.Enabled := True;
@@ -825,6 +823,8 @@ begin
     if(length(doubleMatrix) = 0) then
     raise ERangeError.Create('');
     LoadMainData(doubleMatrix);
+    TesterUnit.CURRENTTESTSET := 'NONE';
+    TesterForm.UpdateTestVisual();
   except
     On e1: EInOutError do
       ShowMessage(e1.Message);

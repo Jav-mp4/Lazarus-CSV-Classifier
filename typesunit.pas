@@ -7,8 +7,9 @@ uses
   Classes, SysUtils;
 
 type
-  TDoubleMatrix = array of array of double;
   TDoubleArray = array of double;
+  TDoubleMatrix = array of TDoubleArray;
+
 
 
 
