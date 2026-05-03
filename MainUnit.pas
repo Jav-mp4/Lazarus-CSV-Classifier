@@ -823,7 +823,7 @@ begin
     if(length(doubleMatrix) = 0) then
     raise ERangeError.Create('');
     LoadMainData(doubleMatrix);
-    TesterUnit.CURRENTTESTSET := 'NONE';
+    TesterUnit.TMCURRENTSTATUS := 'NONE';
     TesterForm.UpdateTestVisual();
   except
     On e1: EInOutError do
@@ -1009,7 +1009,7 @@ end;
 procedure TMainForm.ClearDataBtnClick(Sender: TObject);
 begin
   CURRENTGRAPH := 'NONE';
-  TesterUnit.CURRENTTESTSET := 'NONE';
+  TesterUnit.TMCURRENTSTATUS := 'NONE';
   UpdateDataChart();
   TesterForm.UpdateTestVisual();
 end;

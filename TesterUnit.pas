@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, Grids,
-  ExtCtrls, TAGraph, Math, TypesUnit;
+  ExtCtrls, TAGraph, TASeries, TAChartUtils, Math, TypesUnit;
 
 type
 
@@ -14,7 +14,8 @@ type
 
   TTesterForm = class(TForm)
     AddTestDataBtn: TButton;
-    Chart1: TChart;
+    TestChartBarSeries1: TBarSeries;
+    TestChart: TChart;
     EvaluateBtn: TButton;
     EvaluationTypeCB: TComboBox;
     ClassificationBtn: TButton;
@@ -41,6 +42,7 @@ type
     procedure EvaluateClassifier();
     procedure ClearTestData();
     procedure UpdateStringGrids();
+    procedure UpdateTestGraph();
     function ApplyNaiveBayes(rowIndex: integer): Integer;
     function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
 
@@ -69,7 +71,8 @@ var
   TMCLASSPERCENT, TESTMATRIX: TDoubleMatrix;
   TMCLASSRESULTS, TMREALCLASS: array of integer;
   TMSELECTEDROW, TMROWSIZE, TMCOLSIZE, IGNORESTART, IGNOREEND: integer;
-  CURRENTTESTSET: String;
+  TSHASCLASS: Boolean;
+  TMCURRENTSTATUS: String;
 
 implementation
 
@@ -84,7 +87,7 @@ uses
 //Valores de inicio
 procedure TTesterForm.FormCreate(Sender: TObject);
 begin
-  CURRENTTESTSET := 'NONE';
+  TMCURRENTSTATUS := 'NONE';
   VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
@@ -122,14 +125,14 @@ begin
           TMREALCLASS[i] := Round(doubleMatrix[i + 1, MainUnit.DMCOLSIZE]);
           //ClassStringGrid.Cells[0, i + 1] := IntToStr(TMREALCLASS[i]); //Para probar la clase en TMREALCLASS
         end;
-        CURRENTTESTSET:= 'HAS_CLASS';
+        TSHASCLASS:= True;
       end
       //Valores que depended si no tiene clase
       else
       begin
         SetLength(TMREALCLASS, 1);
         TMREALCLASS[0] := -1;
-        CURRENTTESTSET:= 'NO_CLASS';
+        TSHASCLASS := False;
       end;
       {//Se asigna como no revisado para cuando pase a CheckExistingRows()
       for i:= 0 to Length(TMCLASSRESULTS)-1 do
@@ -140,7 +143,8 @@ begin
       //Se asignan tamaños a matrizes de datos
       SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
       SetLength(TMCLASSRESULTS, TMROWSIZE);
-
+      SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
+      TMCURRENTSTATUS := 'NOT_CLASSIFIED';
       //Se agregan los datos a TESTMATRIX
       for i := 0 to TMROWSIZE - 1 do
       begin
@@ -214,7 +218,7 @@ begin
         TMCLASSRESULTS[i] := ApplyNaiveBayes(i);
         ClassStringGrid.Cells[0,i+1] := IntToStr(TMCLASSRESULTS[i]);
       end;
-
+      TMCURRENTSTATUS := 'CLASSIFIED';
     end;
     'other':
       ShowMessage('other');
@@ -240,14 +244,16 @@ begin
         IGNOREEND := (TMROWSIZE * f)-1;
         for i := 0 to TMROWSIZE - 1 do
           for j := 0 to TMCOLSIZE - 1 do
-            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART+i, j];
+            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART+i, j];;
       //Se asignan los valores reales de clase en TMREALCLASS
       SetLength(TMREALCLASS, TMROWSIZE);
       SetLength(TMCLASSRESULTS, TMROWSIZE);
       for i := 0 to TMROWSIZE - 1 do
         TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
+      TSHASCLASS := True;
       //Se asigna tamaño a TMCLASSPERCENT
       SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
+      TMCURRENTSTATUS := 'NOT_CLASSIFIED';
       //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
       UpdateStringGrids();
       ClassifyTestSet();
@@ -265,12 +271,10 @@ var
   //C = Clase
   i, j, currentC, totalC, sameValueNum: integer;
   cMatchIndex: array of integer;
-  totalCProb, ColCProb, cElements: TDoubleArray;
+  ColCProb, cElements: TDoubleArray;
   mean, deviation, cProbInDM: double;
 begin
   totalC := MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1];
-  //Areglo del procentaje total de cada clase
-  SetLength(totalCProb, totalC);
   //Arreglo del porcentaje en cada columna para la clase actual
   SetLength(ColCProb, TMCOLSIZE);
   ////Recorre todas las clases
@@ -336,14 +340,14 @@ begin
           ColCProb[j] := 1e-308;
     end;
     //Se agrega valor neutro de multiplicacion
-    totalCProb[currentC] := 1;
+    TMCLASSPERCENT[rowIndex, currentC] := 1;
     //Se obtiene la probabilidad conjunta de todas las probabilidades de atributo
     for j := 0 to TMCOLSIZE - 1 do
     begin
-      totalCProb[currentC] := totalCProb[currentC] * ColCProb[j];
+      TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * ColCProb[j];
       //Si el valor es demasiado pequeño se regresa a el limite de 1e-200 para que el programa no lo convierta en 0
-      if (totalCProb[currentC] < 1e-308) then
-          totalCProb[currentC] := 1e-308;
+      if (TMCLASSPERCENT[rowIndex, currentC] < 1e-308) then
+          TMCLASSPERCENT[rowIndex, currentC] := 1e-308;
     end;
     //Se multiplica por la probabilidad de clase
     cProbInDM := 0;
@@ -351,9 +355,9 @@ begin
       if (MainUnit.CLASSARRAY[i] = currentC) then
         cProbInDM += 1;
     cProbInDM := cProbInDM / Length(MainUnit.CLASSARRAY);
-    totalCProb[currentC] := totalCProb[currentC] * cProbInDM;
+    TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * cProbInDM;
   end;
-  result := SelectMaxProbClass(totalCProb);
+  result := SelectMaxProbClass(TMCLASSPERCENT[rowIndex]);
 end;
 
 function TtesterForm.SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
@@ -411,7 +415,7 @@ var
   i: integer;
 begin
   //Si no hay se elige NONE se borran todos los datos y se limpian los StringGrid
-  if (CURRENTTESTSET = 'NONE') then
+  if (TMCURRENTSTATUS = 'NONE') then
   begin
     ClearTestData();
   end
@@ -420,6 +424,20 @@ begin
     ClassifierTypeCB.Enabled := True;
     ClassificationBtn.Enabled := True;
   end;
+end;
+
+procedure TTesterForm.UpdateTestGraph();
+var
+  i, j: Integer;
+begin
+  TestChartBarSeries1.Clear;
+  TestChartBarSeries1.BarWidthPercent := 80;
+  TestChartBarSeries1.Marks.Visible := True;
+  TestChartBarSeries1.Marks.Style := smsLabel;
+  TestChartBarSeries1.Marks.LabelBrush.Color := clWhite;
+  TestChartBarSeries1.Marks.Frame.Visible := False;
+  for J := 0 to Length(TMCLASSPERCENT) - 1 do
+        TestChartBarSeries1.AddXY(j, TMCLASSPERCENT[SELECTEDROW,j], IntToStr(j),MainForm.RandomRGB(60, 90, 60, 140, 150, 150));
 end;
 
 procedure TTesterForm.ClearTestData();
@@ -444,6 +462,8 @@ begin
   ColNumberStringGrid.LeftCol := TestDataStringGrid.LeftCol;
   RowNumberStringGrid.TopRow := TestDataStringGrid.TopRow - 1;
   ClassStringGrid.TopRow := TestDataStringGrid.TopRow;
+  if (TMCURRENTSTATUS = 'CLASSIFIED') then
+     UpdateTestGraph();
 end;
  
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FUNCIONES<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
@@ -483,8 +503,8 @@ end;
 
 procedure TTesterForm.TestDataStringGridSelection(Sender: TObject; aCol, aRow: integer);
 begin
-  DataStringPositionChange();
   SELECTEDROW := TestDataStringGrid.Row - 1;
+  DataStringPositionChange();
   TestDataStringGrid.Invalidate;
   RowNumberStringGrid.Invalidate;
   ClassStringGrid.Invalidate;

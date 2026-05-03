@@ -206,7 +206,7 @@ object TesterForm: TTesterForm
     TabOrder = 13
     OnClick = EvaluateBtnClick
   end
-  object Chart1: TChart
+  object TestChart: TChart
     Left = 72
     Height = 352
     Top = 96
@@ -227,5 +227,8 @@ object TesterForm: TTesterForm
     Title.Text.Strings = (
       'TAChart'
     )
+    object TestChartBarSeries1: TBarSeries
+      BarBrush.Color = clRed
+    end
   end
 end
