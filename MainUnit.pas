@@ -13,6 +13,7 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
+    MenuItem2: TMenuItem;
     TesterBtn: TButton;
     ClearDataBtn: TButton;
     CurrentRowEdit: TEdit;
@@ -62,6 +63,8 @@ type
     procedure GenerateBarChart();
     procedure GetStats();
     procedure ClearData();
+    procedure EnableFormElements();
+    procedure DisableFormElements();
     procedure DeleteRow();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
     procedure RowNumberStringGridSelection(Sender: TObject; aCol, aRow: integer);
@@ -138,6 +141,7 @@ begin
   DataChartLineSeries1.ShowLines := False;
   SymbolsImage.Picture.LoadFromFile('StatsSymbols.jpg');
   CURRENTGRAPH := 'NONE';
+  UpdateDataChart();
 
   //Cargar archivo automaticamente para pruebas//
   XCOLINDEX := 0;
@@ -306,11 +310,7 @@ begin
   YColEdit.Text := IntToStr(YCOLINDEX + 1);
   DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
 
-  XYCOLlBtn.Enabled := True;
-  ScatterPlotTB.Enabled := True;
-  BarChartTB.Enabled := True;
-  BoxPlotTB.Enabled := True;
-  DeleteRowBtn.Enabled := True;
+  EnableFormElements();
   CURRENTGRAPH := 'SCATTERPLOT';
   UpdateDataChart();
   except
@@ -533,6 +533,7 @@ end;
 //-------------------------Limpiar Datos-------------------------------//
 procedure TMainForm.ClearData();
 begin
+  //Limpiar datos
   SetLength(DATAMATRIX, 0, 0);
   SetLength(STATSMATRIX, 0, 0);
   SetLength(SORTEDMATRIX, 0, 0);
@@ -544,24 +545,47 @@ begin
   YCOLINDEX := -1;
   SELECTEDROW := -1;
 
-  XYCOLlBtn.Enabled := False;
+  //Desactivar botones
+  DisableFormElements();
 
-  ScatterPlotTB.Checked := False;
-  ScatterPlotTB.Enabled := False;
-
-  BarChartTB.Checked := False;
-  BarChartTB.Enabled := False;
-
-  BoxPlotTB.Checked := False;
-  BoxPlotTB.Enabled := False;
-  DeleteRowBtn.Enabled := False;
-
+  //Limpiar StringGrids
   DataStringGrid.Clear;
   RowNumberStringGrid.Clear;
   ColNumberStringGrid.Clear;
   StatisticsStringGrid.Clear;
 end;
 
+procedure TMainForm.EnableFormElements();
+begin
+   XYCOLlBtn.Enabled := True;
+  ScatterPlotTB.Checked := True;
+  ScatterPlotTB.Enabled := True;
+  BarChartTB.Checked := True;
+  BarChartTB.Enabled := True;
+  BoxPlotTB.Checked := True;
+  BoxPlotTB.Enabled := True;
+  DeleteRowBtn.Enabled := True;
+  TesterBtn.Enabled := True;
+  XColEdit.Enabled := True;
+  YColEdit.Enabled := True;
+  CurrentRowEdit.Enabled := True;
+end;
+
+procedure TMainForm.DisableFormElements();
+begin
+   XYCOLlBtn.Enabled := False;
+  ScatterPlotTB.Checked := False;
+  ScatterPlotTB.Enabled := False;
+  BarChartTB.Checked := False;
+  BarChartTB.Enabled := False;
+  BoxPlotTB.Checked := False;
+  BoxPlotTB.Enabled := False;
+  DeleteRowBtn.Enabled := False;
+  TesterBtn.Enabled := False;
+  XColEdit.Enabled := False;
+  YColEdit.Enabled := False;
+  CurrentRowEdit.Enabled := False;
+end;
 
 
 //Convertir indices de columna en SORTEDMATRIX a columna real y devolverla en TDoubleArray
@@ -823,8 +847,7 @@ begin
     if(length(doubleMatrix) = 0) then
     raise ERangeError.Create('');
     LoadMainData(doubleMatrix);
-    TesterUnit.TMCURRENTSTATUS := 'NONE';
-    TesterForm.UpdateTestVisual();
+    TesterForm.ClearTestData();
   except
     On e1: EInOutError do
       ShowMessage(e1.Message);
@@ -832,7 +855,6 @@ begin
       //ShowMessage(e2.Message);
   end;
 end;
-
 
 
 
@@ -1001,7 +1023,8 @@ end;
 procedure TMainForm.FormActivate(Sender: TObject);
 begin
   //Para probar TesterUnit
-  TesterForm.ShowModal;
+  {TesterForm.ShowModal;}
+  TesterForm.ClearTestData();
 end;
 
 

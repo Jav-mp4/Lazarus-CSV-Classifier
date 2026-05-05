@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, Grids,
-  ExtCtrls, TAGraph, TASeries, TAChartUtils, Math, TypesUnit;
+  ExtCtrls, Buttons, TAGraph, TASeries, TAChartUtils, Math, TypesUnit;
 
 type
 
@@ -14,6 +14,7 @@ type
 
   TTesterForm = class(TForm)
     AddTestDataBtn: TButton;
+    PerformanceLabel: TLabel;
     TestChartBarSeries1: TBarSeries;
     TestChart: TChart;
     EvaluateBtn: TButton;
@@ -40,9 +41,13 @@ type
     procedure CheckExistingRows();
     procedure ClassifyTestSet();
     procedure EvaluateClassifier();
+    procedure PerformanceAnalysis();
     procedure ClearTestData();
+    procedure EvaluationButtonsEnabling();
+    procedure InitialValues();
     procedure UpdateStringGrids();
     procedure UpdateTestGraph();
+    procedure UpdatePerformanceVisual();
     function ApplyNaiveBayes(rowIndex: integer): Integer;
     function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
 
@@ -68,9 +73,10 @@ type
 
 var
   TesterForm: TTesterForm;
+  //TM = TESTMATRIX, E = Evaluation
   TMCLASSPERCENT, TESTMATRIX: TDoubleMatrix;
   TMCLASSRESULTS, TMREALCLASS: array of integer;
-  TMSELECTEDROW, TMROWSIZE, TMCOLSIZE, IGNORESTART, IGNOREEND: integer;
+  TMSELECTEDROW, TMROWSIZE, TMCOLSIZE, IGNORESTART, IGNOREEND, ECORRECT, ETOTAL: integer;
   TSHASCLASS: Boolean;
   TMCURRENTSTATUS: String;
 
@@ -92,8 +98,11 @@ begin
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
-  LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
-  UpdateTestVisual();
+
+  //Cargar archivo automaticamente para pruebas//
+  {LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_2Rows.txt'));
+  LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));}
+
 end;
 
 //Obtener datos de prueba de un TDoubleMatrix
@@ -105,14 +114,12 @@ begin
     //Comprobamos que los nuevos datos tengan la misma cantidad de atributos con o sin clase
     if (Length(doubleMatrix[0]) = MainUnit.DMCOLSIZE) or (Length(doubleMatrix[0]) = MainUnit.DMCOLSIZE + 1) then
     begin
-
       //Revisa que todos las etiquetas sean las mismas que las del dataset original excepto la de clase
       for j := 0 to MainUnit.DMCOLSIZE-1 do
       begin
         if not (DATATAG[j] = doubleMatrix[0, j]) then
           raise EConvertError.Create('');
       end;
-
       //Valores que dependen si ya tiene clase
       if (Length(doubleMatrix[0]) = MainUnit.DMCOLSIZE + 1) then
       begin
@@ -142,9 +149,6 @@ begin
       TMCOLSIZE := MainUnit.DMCOLSIZE;
       //Se asignan tamaños a matrizes de datos
       SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
-      SetLength(TMCLASSRESULTS, TMROWSIZE);
-      SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
-      TMCURRENTSTATUS := 'NOT_CLASSIFIED';
       //Se agregan los datos a TESTMATRIX
       for i := 0 to TMROWSIZE - 1 do
       begin
@@ -154,8 +158,10 @@ begin
         end;
       end;
       //Se actualiza la parte visual
+      InitialValues();
       UpdateStringGrids();
       UpdateTestVisual();
+      EvaluationButtonsEnabling();
     end
     else
       raise EConvertError.Create('');
@@ -163,6 +169,68 @@ begin
     //Si la estructura del TestSet no corresponde con el DataSet original
     On e1: EConvertError do
       ShowMessage('testset incompatible with dataset');
+  end;
+end;
+
+procedure TTesterForm.InitialValues();
+begin
+  SetLength(TMCLASSRESULTS, TMROWSIZE);
+  SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
+  TestChartBarSeries1.Clear;
+  TMCURRENTSTATUS := 'NOT_CLASSIFIED';
+  SELECTEDROW := 0;
+end;
+
+procedure TTesterForm.EvaluateClassifier();
+var
+  i, j, f, folds, foldCorrect ,foldTotal: integer;
+begin
+  case EvaluationTypeCB.Text of
+    'K-Fold':
+    begin
+      folds := 5;
+      foldCorrect := 0;
+      foldTotal := 0;
+      if (MainUnit.DMROWSIZE > 5) then
+      begin
+        //Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
+        TMROWSIZE := (MainUnit.DMROWSIZE div folds);
+        TMCOLSIZE := MainUnit.DMCOLSIZE;
+        //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
+        SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
+        for f := 1 to folds do
+        begin
+          IGNORESTART := (TMROWSIZE * f) - TMROWSIZE;
+          IGNOREEND := (TMROWSIZE * f) - 1;
+          for i := 0 to TMROWSIZE - 1 do
+            for j := 0 to TMCOLSIZE - 1 do
+              TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART + i, j];
+          ;
+          //Se asignan los valores reales de clase en TMREALCLASS
+          SetLength(TMREALCLASS, TMROWSIZE);
+          for i := 0 to TMROWSIZE - 1 do
+            TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
+          TSHASCLASS := True;
+          //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
+          InitialValues();
+          TMCURRENTSTATUS := 'EVALUATING';
+          UpdateStringGrids();
+          ClassifyTestSet();
+          //Se suman los aciertos y numero de elementos de todos los folds
+          PerformanceAnalysis();
+          foldCorrect += ECORRECT;
+          foldTotal += ETOTAL;
+        end;
+        //Se obtiene el valor real de exactitud y error
+        ECORRECT := foldCorrect;
+        ETOTAL := foldTotal;
+        UpdatePerformanceVisual();
+      end
+      else
+          showmessage('Trainig set is smaller than k');
+    end;
+    'other':
+      ShowMessage('other');
   end;
 end;
 
@@ -206,8 +274,13 @@ end;
 
 procedure TTesterForm.ClassifyTestSet();
 var
-  i: integer;
+  i, j: integer;
 begin
+  if not (TMCURRENTSTATUS = 'EVALUATING') then
+  begin
+    IGNORESTART := -1;
+    IGNOREEND := -1;
+  end;
   case ClassifierTypeCB.Text of
     'Naive Bayes':
     begin
@@ -216,54 +289,17 @@ begin
       begin
         //Se aplica el algoritmo para todos los elementos
         TMCLASSRESULTS[i] := ApplyNaiveBayes(i);
-        ClassStringGrid.Cells[0,i+1] := IntToStr(TMCLASSRESULTS[i]);
+        ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSRESULTS[i]);
       end;
       TMCURRENTSTATUS := 'CLASSIFIED';
+      PerformanceAnalysis();
     end;
     'other':
       ShowMessage('other');
   end;
 end;
 
-procedure TTesterForm.EvaluateClassifier();
-var
-  i, j, f, folds: Integer;
-begin
-  folds := 5;
-  case EvaluationTypeCB.Text of
-    'K-Fold':
-    begin
-      //Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
-      TMROWSIZE := (MainUnit.DMROWSIZE div folds);
-      TMCOLSIZE := MainUnit.DMCOLSIZE;
-      //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
-      SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
-      for f := 1 to folds do
-      begin
-        IGNORESTART := (TMROWSIZE * f)-TMROWSIZE;
-        IGNOREEND := (TMROWSIZE * f)-1;
-        for i := 0 to TMROWSIZE - 1 do
-          for j := 0 to TMCOLSIZE - 1 do
-            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART+i, j];;
-      //Se asignan los valores reales de clase en TMREALCLASS
-      SetLength(TMREALCLASS, TMROWSIZE);
-      SetLength(TMCLASSRESULTS, TMROWSIZE);
-      for i := 0 to TMROWSIZE - 1 do
-        TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
-      TSHASCLASS := True;
-      //Se asigna tamaño a TMCLASSPERCENT
-      SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
-      TMCURRENTSTATUS := 'NOT_CLASSIFIED';
-      //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
-      UpdateStringGrids();
-      ClassifyTestSet();
-      showmessage(' ');
-      end;
-    end;
-    'other':
-      ShowMessage('other');
-  end;
-end;
+
 
 //Aplica el algoritmo Naive Bayes para encontrar la clase
 function TTesterForm.ApplyNaiveBayes(rowIndex: integer): Integer;
@@ -284,10 +320,13 @@ begin
     SetLength(cMatchIndex, 0);
     for i := 0 to MainUnit.DMROWSIZE-1 do
     begin
-      if (MainUnit.CLASSARRAY[i] = currentC) then
+      if (i < IGNORESTART) or (i > IGNOREEND) then
       begin
-        SetLength(cMatchIndex, Length(cMatchIndex) + 1);
-        cMatchIndex[Length(cMatchIndex) - 1] := i;
+        if (MainUnit.CLASSARRAY[i] = currentC) then
+        begin
+          SetLength(cMatchIndex, Length(cMatchIndex) + 1);
+          cMatchIndex[Length(cMatchIndex) - 1] := i;
+        end;
       end;
     end;
     //Recorre todas las columnas
@@ -410,9 +449,37 @@ begin
 end;
 
 
-procedure TTesterForm.UpdateTestVisual();
+procedure TTesterForm.PerformanceAnalysis();
 var
   i: integer;
+begin
+  if (TSHASCLASS) then
+  begin
+    ECORRECT := 0;
+    ETOTAL := 0;
+    for i := 0 to Length(TMCLASSRESULTS) - 1 do
+    begin
+      ETOTAL += 1;
+      if (TMCLASSRESULTS[i] = TMREALCLASS[i]) then
+        ECORRECT += 1;
+    end;
+    if not (TMCURRENTSTATUS = 'EVALUATING') then
+      UpdatePerformanceVisual();
+  end;
+end;
+
+procedure TTesterForm.UpdatePerformanceVisual();
+var
+  error, accuracy : float;
+begin
+  accuracy := (ECORRECT / ETOTAL) * 100;
+  error := (ETOTAL - ECORRECT) / ETOTAL;
+  accuracy := Round(accuracy * 100) / 100;
+  error := Round(error * 100) / 100;
+  PerformanceLabel.Caption := 'Accuracy = '+FloatToStr(accuracy)+'     Error = '+FloatToStr(error);
+end;
+
+procedure TTesterForm.UpdateTestVisual();
 begin
   //Si no hay se elige NONE se borran todos los datos y se limpian los StringGrid
   if (TMCURRENTSTATUS = 'NONE') then
@@ -428,33 +495,56 @@ end;
 
 procedure TTesterForm.UpdateTestGraph();
 var
-  i, j: Integer;
+  j: Integer;
 begin
   TestChartBarSeries1.Clear;
   TestChartBarSeries1.BarWidthPercent := 80;
-  TestChartBarSeries1.Marks.Visible := True;
+  TestChartBarSeries1.Marks.Visible := False;
   TestChartBarSeries1.Marks.Style := smsLabel;
   TestChartBarSeries1.Marks.LabelBrush.Color := clWhite;
   TestChartBarSeries1.Marks.Frame.Visible := False;
-  for J := 0 to Length(TMCLASSPERCENT) - 1 do
-        TestChartBarSeries1.AddXY(j, TMCLASSPERCENT[SELECTEDROW,j], IntToStr(j),MainForm.RandomRGB(60, 90, 60, 140, 150, 150));
+  for j := 0 to Length(TMCLASSPERCENT[0]) - 1 do
+  begin
+    TestChartBarSeries1.AddXY(j, Round(TMCLASSPERCENT[SELECTEDROW, j]*Power(10,20))/(Power(10,20)), IntToStr(j), MainForm.RandomRGB(60, 90, 60, 140, 150, 150));
+  end;
 end;
-
 procedure TTesterForm.ClearTestData();
 begin
+  //Limpiar datos
   SetLength(TESTMATRIX, 0, 0);
   SetLength(TMCLASSRESULTS, 0);
   SetLength(TMREALCLASS, 1);
   TMREALCLASS[1] := -1;
   TMROWSIZE := 0;
   TMCOLSIZE := 0;
+
+  //Limpiar StringGrids
   TestDataStringGrid.Clear;
   RowNumberStringGrid.Clear;
   ColNumberStringGrid.Clear;
   ClassStringGrid.Clear;
   ColClassStringGrid1.Clear;
+
+  //Desactivar botones
   ClassifierTypeCB.Enabled := False;
   ClassificationBtn.Enabled := False;
+  EvaluationButtonsEnabling();
+
+  TMCURRENTSTATUS := 'NONE';
+end;
+
+procedure TtesterForm.EvaluationButtonsEnabling();
+begin
+  if (MainUnit.CURRENTGRAPH = 'NONE') then
+  begin
+    EvaluateBtn.Enabled := False;
+    EvaluationTypeCB.Enabled := False;
+  end
+  else
+  begin
+    EvaluateBtn.Enabled := True;
+    EvaluationTypeCB.Enabled := True;
+  end;
 end;
 
 procedure TTesterForm.DataStringPositionChange();
@@ -462,7 +552,7 @@ begin
   ColNumberStringGrid.LeftCol := TestDataStringGrid.LeftCol;
   RowNumberStringGrid.TopRow := TestDataStringGrid.TopRow - 1;
   ClassStringGrid.TopRow := TestDataStringGrid.TopRow;
-  if (TMCURRENTSTATUS = 'CLASSIFIED') then
+  if (TMCURRENTSTATUS = 'CLASSIFIED') or ((TMCURRENTSTATUS = 'EVALUATING')) then
      UpdateTestGraph();
 end;
  
@@ -484,6 +574,7 @@ begin
   EvaluateClassifier();
 end;
 
+
 procedure TTesterForm.ClassStringGridSelection(Sender: TObject; aCol,
   aRow: Integer);
 begin
@@ -499,6 +590,7 @@ procedure TTesterForm.TestDataStringGridPrepareCanvas(Sender: TObject; aCol, aRo
 begin
   if (aRow = SELECTEDROW + 1) then
     TestDataStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+
 end;
 
 procedure TTesterForm.TestDataStringGridSelection(Sender: TObject; aCol, aRow: integer);
@@ -549,11 +641,24 @@ begin
   ClassStringGrid.Invalidate;
 end;
 
-procedure TTesterForm.ClassStringGridPrepareCanvas(Sender: TObject; aCol,
-  aRow: Integer; aState: TGridDrawState);
+procedure TTesterForm.ClassStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
 begin
-  if (aRow = SELECTEDROW + 1) then
-    ClassStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+  case TMCURRENTSTATUS of
+    'CLASSIFIED':
+    begin
+      if (aRow = SELECTEDROW + 1) and (StrToInt(ClassStringGrid.Cells[acol, aRow]) = TMREALCLASS[aRow - 1]) then
+        ClassStringGrid.Canvas.Brush.Color := RGBToColor(128, 199, 128)
+      else if (aRow = SELECTEDROW + 1) then
+        ClassStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226)
+      else if  (StrToInt(ClassStringGrid.Cells[acol, aRow]) = TMREALCLASS[aRow - 1]) then
+        ClassStringGrid.Canvas.Brush.Color := RGBToColor(158, 247, 158);
+    end;
+    'NOT_CLASSIFIED':
+    begin
+      if (aRow = SELECTEDROW + 1) then
+        ClassStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
+    end;
+  end;
 end;
 
 procedure TTesterForm.UpScrollBtnClick(Sender: TObject);

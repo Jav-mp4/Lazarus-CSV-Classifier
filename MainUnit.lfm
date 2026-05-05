@@ -319,6 +319,9 @@ object MainForm: TMainForm
         Caption = 'CSV'
         OnClick = LoadCSVMenuItemClick
       end
+      object MenuItem2: TMenuItem
+        Caption = 'MenuItem2'
+      end
     end
   end
 end

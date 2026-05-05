@@ -1,11 +1,11 @@
 object TesterForm: TTesterForm
   Left = 353
-  Height = 489
+  Height = 501
   Top = 250
-  Width = 1114
+  Width = 1128
   Caption = 'Tester'
-  ClientHeight = 489
-  ClientWidth = 1114
+  ClientHeight = 501
+  ClientWidth = 1128
   DesignTimePPI = 106
   LCLVersion = '4.4.0.0'
   OnCreate = FormCreate
@@ -230,5 +230,12 @@ object TesterForm: TTesterForm
     object TestChartBarSeries1: TBarSeries
       BarBrush.Color = clRed
     end
+  end
+  object PerformanceLabel: TLabel
+    Left = 256
+    Height = 17
+    Top = 72
+    Width = 149
+    Caption = 'Accuracy = 0     Error = 0'
   end
 end
