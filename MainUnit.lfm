@@ -41,7 +41,7 @@ object MainForm: TMainForm
     object DataChartBoxAndWhiskerSeries1: TBoxAndWhiskerSeries
     end
   end
-  object XColEdit: TEdit
+  object XValueEdit: TEdit
     Left = 56
     Height = 25
     Top = 56
@@ -50,7 +50,7 @@ object MainForm: TMainForm
     NumbersOnly = True
     TabOrder = 1
   end
-  object YColEdit: TEdit
+  object YValueEdit: TEdit
     Left = 96
     Height = 25
     Top = 56
@@ -316,15 +316,15 @@ object MainForm: TMainForm
   end
   object InterChartYAxisImg: TImage
     Left = 24
-    Height = 411
-    Top = 96
+    Height = 435
+    Top = 72
     Width = 32
   end
   object InterChartXAxisImg: TImage
     Left = 56
     Height = 29
     Top = 506
-    Width = 755
+    Width = 784
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'

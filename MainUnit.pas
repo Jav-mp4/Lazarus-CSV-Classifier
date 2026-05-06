@@ -45,8 +45,8 @@ type
     XYCOLlBtn: TButton;
     DataChartLineSeries1: TLineSeries;
     DataChart: TChart;
-    XColEdit: TEdit;
-    YColEdit: TEdit;
+    XValueEdit: TEdit;
+    YValueEdit: TEdit;
     MainMenu1: TMainMenu;
     MenuItem1: TMenuItem;
     LoadCSVMenuItem: TMenuItem;
@@ -74,6 +74,7 @@ type
     procedure ShowChartElement(elementToShow: string);
     procedure HideChartElement(elementToHide: string);
     procedure GenerateInteractiveChartAxisLines();
+    procedure HandleXYValues();
     procedure DeleteRow();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
     procedure SortColumn(colIndex: integer);
@@ -139,6 +140,8 @@ begin
      DataChart.Color:=back_color;}
 
   SELECTEDROW := -1;
+  IXRange := 10;
+  IYRange := 10;
   VertBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
@@ -250,61 +253,85 @@ begin
 end;
 procedure TMainForm.GenerateInteractiveChartAxisLines();
 var
-  i, x, y, unitNum, unitSize, middleLinePos: Integer;
+  i, x, y, unitNum, unitSize, oneThirdSize: Integer;
+  currentNum: String;
 begin
-  IXRange := 10;
-  IXRange := 10;
   unitNum := 10;
 
   //Limpia TImage de eje Y
   InterChartYAxisImg.Canvas.Brush.Color := RGBToColor(0, 240, 240);
   InterChartYAxisImg.Canvas.FillRect(InterChartYAxisImg.ClientRect);
-  //Generar lineas del eje Y
-
-  with InterChartYAxisImg.Picture.Bitmap.Canvas do
+  //Generar eje Y
+  with InterChartYAxisImg do
   begin
-    Pen.Color := clBlack;
-    Pen.Width := 1;
-    //Linea principal
-    middleLinePos := Round(InterChartYAxisImg.Width / 2);
-    x := middleLinePos;
-    y := 0;
-    MoveTo(x, y);
-    y := InterChartYAxisImg.Height;
-    LineTo(x, y);
-    //Divisiones
-    unitSize := Round(InterChartYAxisImg.Height / unitNum);
+    Picture.Bitmap.Canvas.Pen.Color := clBlack;
+    Picture.Bitmap.Canvas.Pen.Width := 2;
+    //Genera la linea principal del eje
+    x := Width-1;
+    y := Height - InterChartCanvasImg.Height;
+    Picture.Bitmap.Canvas.MoveTo(x, y);
+    y := Height;
+    Picture.Bitmap.Canvas.LineTo(x, y);
+    //Genera las lineas dependiendo de la cantidad de divisiones
+    Picture.Bitmap.Canvas.Pen.Width := 1;
+    oneThirdSize := Round(Width / 3);
+    unitSize := Round(InterChartCanvasImg.Height / unitNum);
     for i := 1 to unitNum do
     begin
-      with InterChartYAxisImg.Picture.Bitmap.Canvas do
-      begin
-        x := Round(middleLinePos/3);
-        y := InterChartYAxisImg.Height-(unitSize*i);
-        MoveTo(x, y);
-        x := middleLinePos+Round(middleLinePos/3)*2;
-        LineTo(x, y);
-      end;
+        x := Width - oneThirdSize;
+        y := Height - (unitSize*i);
+        Picture.Bitmap.Canvas.MoveTo(x, y);
+        x := Width;
+        Picture.Bitmap.Canvas.LineTo(x, y);
     end;
+    //Genera los numeros para cada division
+    for i := 1 to unitNum do
+    begin
+        currentNum := FloatToStr((IYRange/unitNum)*i);
+        x := 0;
+        y := Height - (unitSize*i) - Round(Picture.Bitmap.Canvas.TextHeight(currentNum)/2);
+        Picture.Bitmap.Canvas.TextOut(x, y,currentNum);
+    end;
+    Invalidate;
   end;
-  InterChartYAxisImg.Invalidate;
 
   //Limpia TImage de eje X
   InterChartXAxisImg.Canvas.Brush.Color := RGBToColor(240, 240, 0);
   InterChartXAxisImg.Canvas.FillRect(InterChartXAxisImg.ClientRect);
-  //Generar lineas del eje X
-  with InterChartXAxisImg.Picture.Bitmap.Canvas do
+  //Generar eje X
+  with InterChartXAxisImg do
   begin
-    Pen.Color := clBlack;
-    Pen.Width := 1;
-    //Linea principal;
+    Picture.Bitmap.Canvas.Pen.Color := clBlack;
+    Picture.Bitmap.Canvas.Pen.Width :=2;
+    //Genera la linea principal del eje
     x := 0;
-    y := Round(InterChartXAxisImg.Height / 2);
-    MoveTo(x, y);
-    x := InterChartXAxisImg.Width;
-    LineTo(x,y);
-    //Divisiones
+    y := 1;
+    Picture.Bitmap.Canvas.MoveTo(x, y);
+    x := InterChartCanvasImg.Width;
+    Picture.Bitmap.Canvas.LineTo(x,y);
+    //Genera las lineas dependiendo de la cantidad de divisiones
+    Picture.Bitmap.Canvas.Pen.Width := 1;
+    oneThirdSize := Round(Height / 3);
+    unitSize := Round(InterChartCanvasImg.Width / unitNum);
+    for i := 1 to unitNum do
+    begin
+        x := unitSize*i;
+        y := 0;
+        Picture.Bitmap.Canvas.MoveTo(x, y);
+        y := oneThirdSize;
+        Picture.Bitmap.Canvas.LineTo(x, y);
+    end;
+    //Genera los numeros para cada division
+    for i := 1 to unitNum do
+    begin
+        currentNum := FloatToStr((IXRange/unitNum)*i);
+        x := (unitSize*i) - Round(Picture.Bitmap.Canvas.TextWidth(currentNum)/2);
+        y := Height -Picture.Bitmap.Canvas.TextHeight('1');
+        Picture.Bitmap.Canvas.TextOut(x, y,currentNum);
+    end;
+    Invalidate;
   end;
-  InterChartXAxisImg.Invalidate;
+
 end;
 //------------------------Cargar Archivo Principal -----------------------------//
 procedure TMainForm.LoadMainData(doubleMatrix: TDoubleMatrix);
@@ -379,8 +406,8 @@ begin
   XCOLINDEX := 0;
   YCOLINDEX := 0;
   SELECTEDROW := 0;
-  XColEdit.Text := IntToStr(XCOLINDEX + 1);
-  YColEdit.Text := IntToStr(YCOLINDEX + 1);
+  XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+  YValueEdit.Text := IntToStr(YCOLINDEX + 1);
   DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
 
   EnableStaticFormElements();
@@ -656,8 +683,8 @@ begin
   BoxPlotTB.Enabled := True;
   DeleteRowBtn.Enabled := True;
   TesterBtn.Enabled := True;
-  XColEdit.Enabled := True;
-  YColEdit.Enabled := True;
+  XValueEdit.Enabled := True;
+  YValueEdit.Enabled := True;
   CurrentRowEdit.Enabled := True;
 end;
 
@@ -665,8 +692,8 @@ procedure TMainForm.EnableInterFormElements();
 begin
   XYCOLlBtn.Enabled := True;
   TesterBtn.Enabled := True;
-  XColEdit.Enabled := True;
-  YColEdit.Enabled := True;
+  XValueEdit.Enabled := True;
+  YValueEdit.Enabled := True;
 end;
 
 
@@ -682,8 +709,8 @@ begin
   BoxPlotTB.Enabled := False;
   DeleteRowBtn.Enabled := False;
   TesterBtn.Enabled := False;
-  XColEdit.Enabled := False;
-  YColEdit.Enabled := False;
+  XValueEdit.Enabled := False;
+  YValueEdit.Enabled := False;
   CurrentRowEdit.Enabled := False;
 end;
 
@@ -914,6 +941,8 @@ begin
   end;
 end;
 
+
+
 procedure TMainForm.HideChartElement(elementToHide: string);
 begin
   case elementToHide of
@@ -928,6 +957,70 @@ begin
       DataChart.Top := MainForm.Top + MainForm.Height;
       DataChart.Left := MainForm.Left + MainForm.Width;
       DataChart.Enabled := False;
+    end;
+  end;
+end;
+
+procedure TMainForm.HandleXYValues();
+var
+  x, y: integer;
+begin
+  try
+    case CURRENTGRAPH of
+      'NONE':
+      begin
+
+      end;
+      'SCATTERPLOT':
+      begin
+        x := StrToInt(XValueEdit.Text);
+        y := StrToInt(YValueEdit.Text);
+        if (IsInsideRange(x, DMCOLSIZE)) and (IsInsideRange(y, DMCOLSIZE)) then
+        begin
+          XCOLINDEX := x - 1;
+          YCOLINDEX := y - 1;
+          UpdateDataChart();
+        end
+        else
+          raise ERangeError.Create('invalid index');
+      end;
+      'BARCHART':
+      begin
+        if (not ClasesCheckBox.Checked) then
+        begin
+          x := StrToInt(XValueEdit.Text);
+          if (IsInsideRange(x, DMCOLSIZE)) then
+          begin
+            XCOLINDEX := x - 1;
+            UpdateDataChart();
+          end
+          else
+            raise ERangeError.Create('invalid index');
+        end;
+      end;
+      'BOXPLOT':
+      begin
+
+      end;
+      'INTERACTIVE':
+      begin
+        IXRange := StrToInt(XValueEdit.Text);
+        IYRange := StrToInt(YValueEdit.Text);
+        GenerateInteractiveChartAxisLines();
+      end;
+    end;
+  except
+    On e1: EConvertError do
+    begin
+      ShowMessage(e1.Message);
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
+    end;
+    On e2: ERangeError do
+    begin
+      ShowMessage(e2.Message);
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
     end;
   end;
 end;
@@ -1032,17 +1125,17 @@ procedure TMainForm.ClasesCheckBoxChange(Sender: TObject);
 begin
   if ClasesCheckBox.Checked then
   begin
-    YColEdit.Enabled := False;
-    YColEdit.Text := '';
-    XColEdit.Enabled := False;
-    XColEdit.Text := '';
+    YValueEdit.Enabled := False;
+    YValueEdit.Text := '';
+    XValueEdit.Enabled := False;
+    XValueEdit.Text := '';
   end
   else
   begin
-    YColEdit.Enabled := False;
-    YColEdit.Text := '';
-    XColEdit.Enabled := True;
-    XColEdit.Text := IntToStr(XCOLINDEX + 1);
+    YValueEdit.Enabled := False;
+    YValueEdit.Text := '';
+    XValueEdit.Enabled := True;
+    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
   end;
   UpdateDataChart();
 
@@ -1058,8 +1151,8 @@ begin
     BoxPlotTB.Checked := False;
     ShowLineCheckBox.Visible := True;
     CURRENTGRAPH := 'SCATTERPLOT';
-    XColEdit.Text := IntToStr(XCOLINDEX + 1);
-    YColEdit.Text := IntToStr(YCOLINDEX + 1);
+    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
     UpdateDataChart();
   end
   else
@@ -1082,16 +1175,16 @@ begin
     ClasesCheckBox.Visible := True;
     if ClasesCheckBox.Checked then
     begin
-      XColEdit.Enabled := False;
-      XColEdit.Text := '';
-      YColEdit.Enabled := False;
-      YColEdit.Text := '';
+      XValueEdit.Enabled := False;
+      XValueEdit.Text := '';
+      YValueEdit.Enabled := False;
+      YValueEdit.Text := '';
     end
     else
     begin
-      XColEdit.Text := IntToStr(XCOLINDEX + 1);
-      YColEdit.Enabled := False;
-      YColEdit.Text := '';
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Enabled := False;
+      YValueEdit.Text := '';
     end;
 
     CURRENTGRAPH := 'BARCHART';
@@ -1103,10 +1196,10 @@ begin
       BarChartTB.Checked := True
     else
     begin
-      XColEdit.Enabled := True;
-      XColEdit.Text := IntToStr(XCOLINDEX + 1);
-      YColEdit.Enabled := True;
-      YColEdit.Text := IntToStr(YCOLINDEX + 1);
+      XValueEdit.Enabled := True;
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Enabled := True;
+      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
       ClasesCheckBox.Visible := False;
     end;
 
@@ -1120,8 +1213,8 @@ begin
     ScatterPlotTB.Checked := False;
     BarChartTB.Checked := False;
     CURRENTGRAPH := 'BOXPLOT';
-    XColEdit.Text := IntToStr(XCOLINDEX + 1);
-    YColEdit.Text := IntToStr(YCOLINDEX + 1);
+    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
     UpdateDataChart();
   end
   else
@@ -1195,67 +1288,8 @@ end;
 
 
 procedure TMainForm.XYCOLlBtnClick(Sender: TObject);
-var
-  x, y: integer;
 begin
-  try
-    case CURRENTGRAPH of
-      'NONE':
-      begin
-
-      end;
-
-      'SCATTERPLOT':
-      begin
-        x := StrToInt(XColEdit.Text);
-        y := StrToInt(YColEdit.Text);
-        if (IsInsideRange(x, DMCOLSIZE)) and (IsInsideRange(y, DMCOLSIZE)) then
-        begin
-          XCOLINDEX := x - 1;
-          YCOLINDEX := y - 1;
-          UpdateDataChart();
-        end
-        else
-          raise ERangeError.Create('invalid index');
-      end;
-      'BARCHART':
-      begin
-        if (not ClasesCheckBox.Checked) then
-        begin
-          x := StrToInt(XColEdit.Text);
-          if (IsInsideRange(x, DMCOLSIZE)) then
-          begin
-            XCOLINDEX := x - 1;
-            UpdateDataChart();
-          end
-          else
-            raise ERangeError.Create('invalid index');
-        end;
-      end;
-      'BOXPLOT':
-      begin
-
-      end;
-      'INTERACTIVE':
-      begin
-        IXRange := XCOLINDEX;
-        IYRange := YCOLINDEX;
-      end;
-    end;
-  except
-    On e1: EConvertError do
-    begin
-      ShowMessage(e1.Message);
-      XColEdit.Text := IntToStr(XCOLINDEX + 1);
-      YColEdit.Text := IntToStr(YCOLINDEX + 1);
-    end;
-    On e2: ERangeError do
-    begin
-      ShowMessage(e2.Message);
-      XColEdit.Text := IntToStr(XCOLINDEX + 1);
-      YColEdit.Text := IntToStr(YCOLINDEX + 1);
-    end;
-  end;
+  HandleXYValues();
 end;
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EVENTOS<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
