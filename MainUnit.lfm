@@ -1,10 +1,10 @@
 object MainForm: TMainForm
   Left = 429
-  Height = 576
+  Height = 573
   Top = 250
   Width = 1347
   Caption = 'Maximus Classifiersicus'
-  ClientHeight = 576
+  ClientHeight = 573
   ClientWidth = 1347
   DesignTimePPI = 106
   Menu = MainMenu1
@@ -308,6 +308,24 @@ object MainForm: TMainForm
     TabOrder = 21
     OnClick = TesterBtnClick
   end
+  object InterChartCanvasImg: TImage
+    Left = 56
+    Height = 411
+    Top = 96
+    Width = 755
+  end
+  object InterChartYAxisImg: TImage
+    Left = 24
+    Height = 411
+    Top = 96
+    Width = 32
+  end
+  object InterChartXAxisImg: TImage
+    Left = 56
+    Height = 29
+    Top = 506
+    Width = 755
+  end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
   end
@@ -319,8 +337,9 @@ object MainForm: TMainForm
         Caption = 'CSV'
         OnClick = LoadCSVMenuItemClick
       end
-      object MenuItem2: TMenuItem
-        Caption = 'MenuItem2'
+      object CreateInteractiveChart: TMenuItem
+        Caption = 'Interactive Chart'
+        OnClick = CreateInteractiveChartClick
       end
     end
   end

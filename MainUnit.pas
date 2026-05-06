@@ -13,7 +13,10 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
-    MenuItem2: TMenuItem;
+    InterChartXAxisImg: TImage;
+    InterChartYAxisImg: TImage;
+    InterChartCanvasImg: TImage;
+    CreateInteractiveChart: TMenuItem;
     TesterBtn: TButton;
     ClearDataBtn: TButton;
     CurrentRowEdit: TEdit;
@@ -48,6 +51,7 @@ type
     MenuItem1: TMenuItem;
     LoadCSVMenuItem: TMenuItem;
     OpenDialog1: TOpenDialog;
+    procedure CreateInteractiveChartClick(Sender: TObject);
     procedure FormActivate(Sender: TObject);
     procedure TesterBtnClick(Sender: TObject);
     procedure BoxPlotTBChange(Sender: TObject);
@@ -58,16 +62,20 @@ type
 
     //Funciones
     function LoadCSVFileToMatrix(root: string): TDoubleMatrix;
+    procedure LoadInteractiveChart();
     procedure LoadMainData(doubleMatrix: TDoubleMatrix);
     procedure GenerateScatterPlot();
     procedure GenerateBarChart();
     procedure GetStats();
     procedure ClearData();
-    procedure EnableFormElements();
+    procedure EnableStaticFormElements();
+    procedure EnableInterFormElements();
     procedure DisableFormElements();
+    procedure ShowChartElement(elementToShow: string);
+    procedure HideChartElement(elementToHide: string);
+    procedure GenerateInteractiveChartAxisLines();
     procedure DeleteRow();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
-    procedure RowNumberStringGridSelection(Sender: TObject; aCol, aRow: integer);
     procedure SortColumn(colIndex: integer);
     procedure DataStringPositionChange();
     function IsInsideRange(index: integer; range: integer): boolean;
@@ -80,6 +88,8 @@ type
     function RandomRGB(RMin, RMax, GMin, GMax, BMin, BMax: integer): TColor;
 
     //Eventos
+
+    procedure RowNumberStringGridSelection(Sender: TObject; aCol, aRow: integer);
     procedure RowNumberStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
     procedure DeleteRowBtnClick(Sender: TObject);
     procedure DownScrollBtnClick(Sender: TObject);
@@ -107,7 +117,7 @@ var
   DATAMATRIX, STATSMATRIX: TDoubleMatrix;
   SORTEDMATRIX: array of array of integer;
   DATATAG, CLASSARRAY: array of integer;
-  DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW: integer;
+  DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW, IXRange, IYRange: integer;
   CURRENTGRAPH: string;
 
 implementation
@@ -133,6 +143,9 @@ begin
   VertBarImage.Canvas.FillRect(VertBarImage.ClientRect);
   HorzBarImage.Canvas.Brush.Color := RGBToColor(226, 226, 226);
   HorzBarImage.Canvas.FillRect(HorzBarImage.ClientRect);
+  InterChartCanvasImg.Canvas.Brush.Color := RGBToColor(250, 60, 250);
+  InterChartCanvasImg.Canvas.FillRect(InterChartCanvasImg.ClientRect);;
+  GenerateInteractiveChartAxisLines();
   DataChartLineSeries1.Clear;
   DataChartLineSeries1.Pointer.Style := psCircle;
   DataChartLineSeries1.Pointer.Brush.Color := Clred;
@@ -142,12 +155,6 @@ begin
   SymbolsImage.Picture.LoadFromFile('StatsSymbols.jpg');
   CURRENTGRAPH := 'NONE';
   UpdateDataChart();
-
-  //Cargar archivo automaticamente para pruebas//
-  XCOLINDEX := 0;
-  YCOLINDEX := 1;
-  OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
 end;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>FUNCIONES>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
@@ -231,14 +238,80 @@ begin
   end;
 end;
 
+procedure TMainForm.LoadInteractiveChart();
+begin
+  ClearData();
+  DisableFormElements();
+  TesterForm.ClearTestData();
+  EnableInterFormElements();
+  GenerateInteractiveChartAxisLines();
+  CURRENTGRAPH := 'INTERACTIVE';
+  UpdateDataChart();
+end;
+procedure TMainForm.GenerateInteractiveChartAxisLines();
+var
+  i, x, y, unitNum, unitSize, middleLinePos: Integer;
+begin
+  IXRange := 10;
+  IXRange := 10;
+  unitNum := 10;
 
+  //Limpia TImage de eje Y
+  InterChartYAxisImg.Canvas.Brush.Color := RGBToColor(0, 240, 240);
+  InterChartYAxisImg.Canvas.FillRect(InterChartYAxisImg.ClientRect);
+  //Generar lineas del eje Y
+
+  with InterChartYAxisImg.Picture.Bitmap.Canvas do
+  begin
+    Pen.Color := clBlack;
+    Pen.Width := 1;
+    //Linea principal
+    middleLinePos := Round(InterChartYAxisImg.Width / 2);
+    x := middleLinePos;
+    y := 0;
+    MoveTo(x, y);
+    y := InterChartYAxisImg.Height;
+    LineTo(x, y);
+    //Divisiones
+    unitSize := Round(InterChartYAxisImg.Height / unitNum);
+    for i := 1 to unitNum do
+    begin
+      with InterChartYAxisImg.Picture.Bitmap.Canvas do
+      begin
+        x := Round(middleLinePos/3);
+        y := InterChartYAxisImg.Height-(unitSize*i);
+        MoveTo(x, y);
+        x := middleLinePos+Round(middleLinePos/3)*2;
+        LineTo(x, y);
+      end;
+    end;
+  end;
+  InterChartYAxisImg.Invalidate;
+
+  //Limpia TImage de eje X
+  InterChartXAxisImg.Canvas.Brush.Color := RGBToColor(240, 240, 0);
+  InterChartXAxisImg.Canvas.FillRect(InterChartXAxisImg.ClientRect);
+  //Generar lineas del eje X
+  with InterChartXAxisImg.Picture.Bitmap.Canvas do
+  begin
+    Pen.Color := clBlack;
+    Pen.Width := 1;
+    //Linea principal;
+    x := 0;
+    y := Round(InterChartXAxisImg.Height / 2);
+    MoveTo(x, y);
+    x := InterChartXAxisImg.Width;
+    LineTo(x,y);
+    //Divisiones
+  end;
+  InterChartXAxisImg.Invalidate;
+end;
 //------------------------Cargar Archivo Principal -----------------------------//
 procedure TMainForm.LoadMainData(doubleMatrix: TDoubleMatrix);
 var
   i, j: integer;
 begin
   try
-
   DMROWSIZE := Length(doubleMatrix) - 1;
   DMCOLSIZE := Length(doubleMatrix[0]) - 1;
   SetLength(DATATAG, DMCOLSIZE + 1);
@@ -310,7 +383,7 @@ begin
   YColEdit.Text := IntToStr(YCOLINDEX + 1);
   DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
 
-  EnableFormElements();
+  EnableStaticFormElements();
   CURRENTGRAPH := 'SCATTERPLOT';
   UpdateDataChart();
   except
@@ -348,14 +421,26 @@ begin
   case CURRENTGRAPH of
     'NONE':
     begin
-         ClearData();
+      ClearData();
+      HideChartElement('static');
+      HideChartElement('interactive');
     end;
     'SCATTERPLOT':
+    begin
+      HideChartElement('interactive');
+      ShowChartElement('static');
       GenerateScatterPlot();
+    end;
     'BARCHART':
+    begin
+      HideChartElement('interactive');
+      ShowChartElement('static');
       GenerateBarChart();
+    end;
     'BOXPLOT':
     begin
+      HideChartElement('interactive');
+      ShowChartElement('static');
       j := 0;
       for i := 0 to DMCOLSIZE - 1 do
       begin
@@ -365,6 +450,11 @@ begin
           j += 1;
         end;
       end;
+    end;
+    'INTERACTIVE':
+    begin
+      HideChartElement('static');
+      ShowChartElement('interactive');
     end;
   end;
 end;
@@ -555,14 +645,14 @@ begin
   StatisticsStringGrid.Clear;
 end;
 
-procedure TMainForm.EnableFormElements();
+procedure TMainForm.EnableStaticFormElements();
 begin
    XYCOLlBtn.Enabled := True;
-  ScatterPlotTB.Checked := True;
+  ScatterPlotTB.Checked := False;
   ScatterPlotTB.Enabled := True;
-  BarChartTB.Checked := True;
+  BarChartTB.Checked := False;
   BarChartTB.Enabled := True;
-  BoxPlotTB.Checked := True;
+  BoxPlotTB.Checked := False;
   BoxPlotTB.Enabled := True;
   DeleteRowBtn.Enabled := True;
   TesterBtn.Enabled := True;
@@ -570,6 +660,16 @@ begin
   YColEdit.Enabled := True;
   CurrentRowEdit.Enabled := True;
 end;
+
+procedure TMainForm.EnableInterFormElements();
+begin
+  XYCOLlBtn.Enabled := True;
+  TesterBtn.Enabled := True;
+  XColEdit.Enabled := True;
+  YColEdit.Enabled := True;
+end;
+
+
 
 procedure TMainForm.DisableFormElements();
 begin
@@ -796,7 +896,41 @@ begin
   end;
 end;
 
+procedure TMainForm.ShowChartElement(elementToShow: string);
+begin
+  case elementToShow of
+    'Interactive':
+    begin
+      InterChartCanvasImg.Top := 96;
+      InterChartCanvasImg.Left := 56;
+      InterChartCanvasImg.Enabled := True;
+    end;
+    'static':
+    begin
+      DataChart.Top := 88;
+      DataChart.Left := 24;
+      DataChart.Enabled := True;
+    end;
+  end;
+end;
 
+procedure TMainForm.HideChartElement(elementToHide: string);
+begin
+  case elementToHide of
+    'Interactive':
+    begin
+      InterChartCanvasImg.Top := MainForm.Top + MainForm.Height;
+      InterChartCanvasImg.Left := MainForm.Left + MainForm.Width;
+      InterChartCanvasImg.Enabled := False;
+    end;
+    'static':
+    begin
+      DataChart.Top := MainForm.Top + MainForm.Height;
+      DataChart.Left := MainForm.Left + MainForm.Width;
+      DataChart.Enabled := False;
+    end;
+  end;
+end;
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FUNCIONES<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
 
@@ -837,24 +971,7 @@ begin
 end;
 
 
-procedure TMainForm.LoadCSVMenuItemClick(Sender: TObject);
-var
-  doubleMatrix: TDoubleMatrix;
-begin
-  try
-    OpenDialog1.Execute;
-    doubleMatrix := LoadCSVFileToMatrix(OpenDialog1.FileName);
-    if(length(doubleMatrix) = 0) then
-    raise ERangeError.Create('');
-    LoadMainData(doubleMatrix);
-    TesterForm.ClearTestData();
-  except
-    On e1: EInOutError do
-      ShowMessage(e1.Message);
-    On e2: ERangeError do
-      //ShowMessage(e2.Message);
-  end;
-end;
+
 
 
 
@@ -1024,10 +1141,39 @@ procedure TMainForm.FormActivate(Sender: TObject);
 begin
   //Para probar TesterUnit
   {TesterForm.ShowModal;}
-  TesterForm.ClearTestData();
+  //Cargar archivo automaticamente para pruebas//
+  LoadInteractiveChart();
+  {XCOLINDEX := 0;
+  YCOLINDEX := 1;
+  OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));}
+end;
+
+procedure TMainForm.CreateInteractiveChartClick(Sender: TObject);
+begin
+  LoadInteractiveChart();
 end;
 
 
+
+procedure TMainForm.LoadCSVMenuItemClick(Sender: TObject);
+var
+  doubleMatrix: TDoubleMatrix;
+begin
+  try
+    OpenDialog1.Execute;
+    doubleMatrix := LoadCSVFileToMatrix(OpenDialog1.FileName);
+    if(length(doubleMatrix) = 0) then
+    raise ERangeError.Create('');
+    LoadMainData(doubleMatrix);
+    TesterForm.ClearTestData();
+  except
+    On e1: EInOutError do
+      ShowMessage(e1.Message);
+    On e2: ERangeError do
+      //ShowMessage(e2.Message);
+  end;
+end;
 
 procedure TMainForm.ClearDataBtnClick(Sender: TObject);
 begin
@@ -1089,6 +1235,11 @@ begin
       'BOXPLOT':
       begin
 
+      end;
+      'INTERACTIVE':
+      begin
+        IXRange := XCOLINDEX;
+        IYRange := YCOLINDEX;
       end;
     end;
   except

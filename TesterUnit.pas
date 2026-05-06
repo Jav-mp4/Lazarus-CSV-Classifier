@@ -348,14 +348,10 @@ begin
           mean := MainForm.GetMean(cElements);
           deviation := MainForm.GetStandarDev(cElements, mean);
           //Se evita error si la desviacion estandar es igual a 0
-          if(deviation = 0)then
-            deviation := 1e-308;
-          try
+          if (deviation = 0) then
+            ColCProb[j] := 1e-308
+          else
             ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((TESTMATRIX[rowIndex, j] - mean), 2) / (2 * Power(deviation, 2))));
-          except
-            on e1: EDivByZero do
-              ShowMessage(e1.Message);
-          end;
         end;
       end
       //Evaluacion si la columna es de tipo Nominal
