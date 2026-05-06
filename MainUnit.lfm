@@ -1,10 +1,10 @@
 object MainForm: TMainForm
   Left = 429
-  Height = 573
+  Height = 593
   Top = 250
   Width = 1347
   Caption = 'Maximus Classifiersicus'
-  ClientHeight = 573
+  ClientHeight = 593
   ClientWidth = 1347
   DesignTimePPI = 106
   Menu = MainMenu1
@@ -266,7 +266,7 @@ object MainForm: TMainForm
   object ClearDataBtn: TButton
     Left = 24
     Height = 28
-    Top = 536
+    Top = 552
     Width = 83
     Caption = 'ClearDataBtn'
     TabOrder = 19
@@ -310,9 +310,10 @@ object MainForm: TMainForm
   end
   object InterChartCanvasImg: TImage
     Left = 56
-    Height = 411
+    Height = 410
     Top = 96
-    Width = 755
+    Width = 750
+    OnMouseDown = InterChartCanvasImgMouseDown
   end
   object InterChartYAxisImg: TImage
     Left = 24
@@ -325,6 +326,25 @@ object MainForm: TMainForm
     Height = 29
     Top = 506
     Width = 784
+  end
+  object InterClassCB: TComboBox
+    Left = 728
+    Height = 25
+    Top = 544
+    Width = 83
+    ItemHeight = 17
+    ReadOnly = True
+    Style = csDropDownList
+    TabOrder = 22
+  end
+  object AddInterClassBtn: TButton
+    Left = 688
+    Height = 25
+    Top = 544
+    Width = 27
+    Caption = '+'
+    TabOrder = 23
+    OnClick = AddInterClassBtnClick
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
