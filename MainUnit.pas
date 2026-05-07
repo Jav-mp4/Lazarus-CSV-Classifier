@@ -263,38 +263,100 @@ begin
 end;
 
 procedure TMainForm.InterChartStartValues();
+var j: Integer;
 begin
+  //Se limpian valores en el arreglo de datos y el de colores de clase
   SetLength(DATATAG,3);
   SetLength(CLASSCOLORS,0);
+  SetLength(STATSMATRIX,3,2);
   DATATAG[0] := 0;
   DATATAG[1] := 0;
   DATATAG[2] := 0;
+  DMCOLSIZE := 2;
+  DMROWSIZE := 0;
+  //Se genera el DataStringGrid inicial con 1 fila y 3 columnas
+  DataStringGrid.RowCount := 1;
+  DataStringGrid.ColCount := 3;
+  DataStringGrid.Cells[0,0] := '0';
+  DataStringGrid.Cells[1,0] := '0';
+  StatisticsStringGrid.RowCount := 3;
+  StatisticsStringGrid.ColCount := 3;
+
+
+  ColNumberStringGrid.RowCount := 1;
+  ColNumberStringGrid.ColCount := 3;
+
+
+  for j := 0 to DMCOLSIZE - 1 do
+    ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
+  ColNumberStringGrid.Cells[DMCOLSIZE, 0] := 'Class';
+
+  ColNumberStringGrid.LeftCol := 0;
+  DataStringGrid.LeftCol := 0;
+  StatisticsStringGrid.LeftCol := 0;
+
+  //Se agrega la primera clase y se muestra en el ComboBox
   AddInterClass();
   InterClassCB.ItemIndex := 0;
+
+  CURRENTGRAPH := 'INTERACTIVE';
+  TesterForm.EvaluationButtonsEnabling();
 end;
 
 procedure TMainForm.AddInterClass();
 begin
   DATATAG[2] += 1;
   SetLength(CLASSCOLORS,Length(CLASSCOLORS)+1);
+  //Se le agrega color aleatorio a la clase para pintar puntos en la grafica interactiva
   CLASSCOLORS[Length(CLASSCOLORS)-1] := RandomRGB(0, 255, 0, 255, 0, 255);
   InterClassCB.Items.Add('Class ' + IntToStr(DATATAG[2]-1));
+  DataStringGrid.Cells[2,0] := IntToStr(DATATAG[2]);
 end;
 procedure TMainForm.GenerateInterPoint(x, y: integer);
 var
-  pointSize: Integer;
+  pointSize, i: Integer;
   cColor: TColor;
 begin
   cColor := CLASSCOLORS[InterClassCB.ItemIndex];
   pointSize := 10;
   with InterChartCanvasImg.Picture.Bitmap.Canvas do
   begin
+    //Pintar una elipse de tamaño pointSize alrededor de la coordenada
     Pen.Width := 1;
     Pen.Color := cColor;
     Brush.Color := cColor;
     Brush.Style := bsSolid;
     Ellipse(x - Round(pointSize/2), y - Round(pointSize/2) , x + Round(pointSize/2), y + Round(pointSize/2));
     InterChartCanvasImg.Invalidate;
+
+    DMROWSIZE += 1;
+    //Incrementar tamaños para introducir nuevo elemento
+    SetLength(DATAMATRIX,DMROWSIZE,2);
+    DataStringGrid.RowCount := DMROWSIZE+1;
+    SetLength(CLASSARRAY,DMROWSIZE);
+    SetLength(SORTEDMATRIX,DMROWSIZE,2);
+
+    SORTEDMATRIX[0,0] := -1;
+    SORTEDMATRIX[0,1] := -1;
+
+    //Agregar valor de x
+    DATAMATRIX[DMROWSIZE-1,0] := (x * IXRange) / InterChartCanvasImg.Width;
+    DataStringGrid.Cells[0,DMROWSIZE] := FloatToStr(DATAMATRIX[Length(DATAMATRIX)-1,0]);
+    //Agregar valor de x
+    DATAMATRIX[DMROWSIZE-1,1] := ((InterChartCanvasImg.Height-y) * IYRange) / InterChartCanvasImg.Height;
+    DataStringGrid.Cells[1,DMROWSIZE] := FloatToStr(DATAMATRIX[Length(DATAMATRIX)-1,1]);
+    //Agregar valor de clase
+    CLASSARRAY[DMROWSIZE-1] := InterClassCB.ItemIndex;
+    DataStringGrid.Cells[2, DMROWSIZE] := IntToStr(InterClassCB.ItemIndex);
+    GetStats();
+
+    //Actualizar StringGrids de indices
+
+    RowNumberStringGrid.ColCount := 1;
+    RowNumberStringGrid.RowCount := DMROWSIZE;
+    //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
+    for i := 0 to DMROWSIZE - 1 do
+      RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
   end;
 end;
 
@@ -472,7 +534,7 @@ end;
 
 procedure TMainForm.GetStats();
 var
-  i, j:Integer;
+ j :Integer;
 begin
   //Obtiene los valores Media,Mediana y Desviacion para cada columna
   for j := 0 to DMCOLSIZE - 1 do
@@ -753,6 +815,8 @@ begin
   YValueEdit.Enabled := True;
   InterClassCB.Enabled := True;
   AddInterClassBtn.Enabled := True;
+  DeleteRowBtn.Enabled := True;
+  CurrentRowEdit.Enabled := True;
 end;
 
 
