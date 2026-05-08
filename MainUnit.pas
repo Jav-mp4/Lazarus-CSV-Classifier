@@ -61,15 +61,11 @@ type
     procedure LoadMainData(doubleMatrix: TDoubleMatrix);
     procedure GenerateScatterPlot();
     procedure GenerateBarChart();
-    procedure GetStats();
     procedure EnableStaticFormElements();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
     procedure SortColumn(colIndex: integer);
     function SortedMatrixToArray(colIndex: integer): TDoubleArray;
     function SortedMatrixRealValue(i, j: integer): double;
-    function GetMean(doubleArray: TDoubleArray): double;
-    function GetMedian(sortedDoubleArray: TDoubleArray): double;
-    function GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
     function Discretization(colIndex: integer): TDoubleMatrix;
 
     //Interactive Chart 
@@ -78,9 +74,17 @@ type
     procedure GenerateInteractiveChartAxisLines();
     procedure AddInterClass();
     procedure GenerateInterPoint(x,y:Integer);
+    procedure EraseInterPoint(xCol, yCol: double);
     procedure EnableInterFormElements();
 
     //Funciones
+    function GetMean(doubleArray: TDoubleArray): double;
+    function GetMedian(sortedDoubleArray: TDoubleArray): double;
+    function GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
+    function GetColMinMaxValues(colIndex: integer): TDoubleArray;
+    procedure MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+    procedure GetStats();
+    procedure UpdateDataStringGridValues();
     procedure DisableFormElements();
     procedure ShowChartElement(elementToShow: string);
     procedure HideChartElement(elementToHide: string);
@@ -170,6 +174,55 @@ begin
 end;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>FUNCIONES>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
+
+//Se obtiene el valor minimo y el maximo de la columna  TDoubleArray[0] = minimo,  TDoubleArray[1] = maximo
+function TMainForm.GetColMinMaxValues(colIndex: integer): TDoubleArray;
+var
+  i: integer;
+  //doubleArray[0] = minimo,  doubleArray[1] = maximo
+  doubleArray: TDoubleArray;
+begin
+  SetLength(doubleArray, DMROWSIZE);
+  if not (Length(DATAMATRIX) = 0) then
+  begin
+    doubleArray[0] := DATAMATRIX[0, colIndex];
+    doubleArray[1] := DATAMATRIX[0, colIndex];
+    for i := 0 to Length(doubleArray) - 1 do
+    begin
+      if (DATAMATRIX[i, colIndex] <= doubleArray[0]) then
+        doubleArray[0] := DATAMATRIX[i, colIndex]
+      else
+        doubleArray[1] := DATAMATRIX[i, colIndex];
+    end;
+    Result := doubleArray;
+  end
+  else
+    raise ERangeError.Create('datamatrix is empty');
+end;
+
+procedure TMainForm.MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+var
+  i: integer;
+begin
+  //Se realiza la nomralizacion min-max en cada valor de la columna colIndex
+  for i := 0 to DMROWSIZE-1 do
+      DATAMATRIX[i, colIndex] := ( (DATAMATRIX[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
+end;
+
+
+procedure TMainForm.UpdateDataStringGridValues();
+var
+  i, j: integer;
+begin
+  if not (Length(DATAMATRIX) = 0) then
+  begin
+    for i := 0 to DMROWSIZE - 1 do
+      for j := 0 to DMCOLSIZE - 1 do
+        DataStringGrid.Cells[j, i + 1] := FloatToStr(DATAMATRIX[i, j]);
+    GetStats();
+  end;
+end;
+
 
 //-------Cargar archivo CSV y devolverlo como matriz de tipo Double------//
 function TMainForm.LoadCSVFileToMatrix(root: string): TDoubleMatrix;
@@ -317,6 +370,7 @@ var
   pointSize, i: Integer;
   cColor: TColor;
 begin
+  //showmessage(inttostr(x)+' '+inttostr(y));
   cColor := CLASSCOLORS[InterClassCB.ItemIndex];
   pointSize := 10;
   with InterChartCanvasImg.Picture.Bitmap.Canvas do
@@ -360,6 +414,24 @@ begin
   end;
 end;
 
+procedure TMainForm.EraseInterPoint(xCol, yCol: double);
+var
+  x, y, pointSize: integer;
+begin
+  pointSize := 10;
+  with InterChartCanvasImg.Picture.Bitmap.Canvas do
+  begin
+    Pen.Width := 1;
+    Pen.Color := clWhite;
+    Brush.Color := clWhite;
+    Brush.Style := bsSolid;
+    x := Round ( (xCol * InterChartCanvasImg.Width) / IXRange);
+    y := Round( (InterChartCanvasImg.Height - (yCol * InterChartCanvasImg.Height) / IYRange) );
+    Ellipse(x - Round(pointSize / 2), y - Round(pointSize / 2), x + Round(pointSize / 2), y + Round(pointSize / 2));
+    //showmessage(inttostr(x)+' '+inttostr(y));
+    InterChartCanvasImg.Invalidate;
+  end;
+end;
 
 //-----------------Generar las lineas de la grafica interactiva-------------//
 procedure TMainForm.GenerateInteractiveChartAxisLines();
@@ -856,6 +928,8 @@ begin
   Result := sortedArray;
 end;
 
+
+
 //Valor real del indice en SORTEDMATRIX
 function TMainForm.SortedMatrixRealValue(i, j: integer): double;
 begin
@@ -989,6 +1063,9 @@ begin
     if (IsInsideRange(StrToInt(CurrentRowEdit.Text), DMROWSIZE)) then
     begin
       rowToDelete := StrToInt(CurrentRowEdit.Text) - 1;
+      //Si la grafica actual es interactiva se borra punto en la grafica interactiva que corresponde a la fila
+      if (CURRENTGRAPH = 'INTERACTIVE') then
+        EraseInterPoint(DATAMATRIX[rowToDelete,0], DATAMATRIX[rowToDelete,1]);
       //A partir de la fila que se quiere eliminar se desplazan todas un indice hacia atras
       for i := rowToDelete to DMROWSIZE - 2 do
       begin
@@ -1022,8 +1099,6 @@ begin
              SORTEDMATRIX[i, j] := SORTEDMATRIX[i, j]-1;
         end;
       end;
-
-
       DMROWSIZE := DMROWSIZE - 1;
       SetLength(DATAMATRIX, DMROWSIZE);
       SetLength(SORTEDMATRIX, DMROWSIZE);
@@ -1035,6 +1110,7 @@ begin
       else
         begin
           CURRENTGRAPH:='NONE';
+          UpdateDataChart();
           ClearData();
         end;
     end
@@ -1100,6 +1176,7 @@ end;
 
 procedure TMainForm.HandleXYValues();
 var
+  oldIXRange, oldIYRange: integer;
   x, y: integer;
 begin
   try
@@ -1141,9 +1218,14 @@ begin
       end;
       'INTERACTIVE':
       begin
+        oldIXRange := IXRange;
+        oldIYRange := IYRange;
         IXRange := StrToInt(XValueEdit.Text);
         IYRange := StrToInt(YValueEdit.Text);
         GenerateInteractiveChartAxisLines();
+        MinMaxDMCol(0, 0, oldIXRange, 0, IXRange);
+        MinMaxDMCol(1, 0, oldIYRange, 0, IYRange);
+        UpdateDataStringGridValues();
       end;
     end;
   except
