@@ -78,45 +78,25 @@ object MainForm: TMainForm
     Alignment = taCenter
     Caption = 'Columns 100     Rows 100'
   end
-  object ScatterPlotTB: TToggleBox
-    Cursor = crHandPoint
-    Left = 536
-    Height = 28
-    Top = 56
-    Width = 83
-    Caption = 'Scatter Plot'
-    TabOrder = 4
-    OnChange = ScatterPlotTBChange
-  end
-  object BarChartTB: TToggleBox
-    Cursor = crHandPoint
-    Left = 632
-    Height = 28
-    Top = 56
-    Width = 83
-    Caption = 'Bar Chart'
-    TabOrder = 5
-    OnChange = BarChartTBChange
-  end
   object ShowLineCheckBox: TCheckBox
     Cursor = crHandPoint
-    Left = 536
+    Left = 701
     Height = 21
     Top = 32
     Width = 48
     Caption = 'Lines'
-    TabOrder = 6
+    TabOrder = 4
     Visible = False
     OnChange = ShowLineCheckBoxChange
   end
   object ClasesCheckBox: TCheckBox
     Cursor = crHandPoint
-    Left = 632
+    Left = 701
     Height = 21
     Top = 32
     Width = 62
     Caption = 'Classes'
-    TabOrder = 7
+    TabOrder = 5
     Visible = False
     OnChange = ClasesCheckBoxChange
   end
@@ -133,7 +113,7 @@ object MainForm: TMainForm
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 20
     ScrollBars = ssNone
-    TabOrder = 8
+    TabOrder = 6
     OnPrepareCanvas = DataStringGridPrepareCanvas
     OnSelection = DataStringGridSelection
   end
@@ -152,7 +132,7 @@ object MainForm: TMainForm
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 3
     ScrollBars = ssNone
-    TabOrder = 9
+    TabOrder = 7
   end
   object SymbolsImage: TImage
     Left = 1280
@@ -166,7 +146,7 @@ object MainForm: TMainForm
     Top = 511
     Width = 32
     Caption = '←'
-    TabOrder = 10
+    TabOrder = 8
     OnClick = LeftScrollBtnClick
   end
   object RightScrollBtn: TButton
@@ -175,7 +155,7 @@ object MainForm: TMainForm
     Top = 509
     Width = 32
     Caption = '→'
-    TabOrder = 11
+    TabOrder = 9
     OnClick = RightScrollBtnClick
   end
   object ColNumberStringGrid: TStringGrid
@@ -193,17 +173,7 @@ object MainForm: TMainForm
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 1
     ScrollBars = ssNone
-    TabOrder = 12
-  end
-  object BoxPlotTB: TToggleBox
-    Cursor = crHandPoint
-    Left = 728
-    Height = 28
-    Top = 56
-    Width = 83
-    Caption = 'Box Plot'
-    TabOrder = 13
-    OnChange = BoxPlotTBChange
+    TabOrder = 10
   end
   object RowNumberStringGrid: TStringGrid
     Cursor = crHandPoint
@@ -224,7 +194,7 @@ object MainForm: TMainForm
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goSmoothScroll]
     RowCount = 13
     ScrollBars = ssNone
-    TabOrder = 14
+    TabOrder = 11
     OnPrepareCanvas = RowNumberStringGridPrepareCanvas
     OnSelection = RowNumberStringGridSelection
   end
@@ -234,7 +204,7 @@ object MainForm: TMainForm
     Top = 95
     Width = 24
     Caption = '↑'
-    TabOrder = 15
+    TabOrder = 12
     OnClick = UpScrollBtnClick
   end
   object DownScrollBtn: TButton
@@ -243,7 +213,7 @@ object MainForm: TMainForm
     Top = 399
     Width = 24
     Caption = '↓'
-    TabOrder = 16
+    TabOrder = 13
     OnClick = DownScrollBtnClick
   end
   object DeleteRowBtn: TButton
@@ -253,7 +223,7 @@ object MainForm: TMainForm
     Top = 40
     Width = 48
     Caption = 'Delete'
-    TabOrder = 17
+    TabOrder = 14
     OnClick = DeleteRowBtnClick
   end
   object VerticalBarlBtn: TButton
@@ -261,7 +231,7 @@ object MainForm: TMainForm
     Height = 12
     Top = 127
     Width = 24
-    TabOrder = 18
+    TabOrder = 15
   end
   object ClearDataBtn: TButton
     Left = 24
@@ -269,7 +239,7 @@ object MainForm: TMainForm
     Top = 552
     Width = 83
     Caption = 'ClearDataBtn'
-    TabOrder = 19
+    TabOrder = 16
     OnClick = ClearDataBtnClick
   end
   object VertBarImage: TImage
@@ -290,7 +260,7 @@ object MainForm: TMainForm
     Top = 40
     Width = 32
     Alignment = taCenter
-    TabOrder = 20
+    TabOrder = 17
   end
   object XYTitleLabel: TLabel
     Left = 68
@@ -305,7 +275,7 @@ object MainForm: TMainForm
     Top = 40
     Width = 59
     Caption = 'Test'
-    TabOrder = 21
+    TabOrder = 18
     OnClick = TesterBtnClick
   end
   object InterChartCanvasImg: TImage
@@ -335,7 +305,7 @@ object MainForm: TMainForm
     ItemHeight = 17
     ReadOnly = True
     Style = csDropDownList
-    TabOrder = 22
+    TabOrder = 19
   end
   object AddInterClassBtn: TButton
     Left = 688
@@ -343,8 +313,27 @@ object MainForm: TMainForm
     Top = 544
     Width = 27
     Caption = '+'
-    TabOrder = 23
+    TabOrder = 20
     OnClick = AddInterClassBtnClick
+  end
+  object DataChartTypeCB: TComboBox
+    Left = 701
+    Height = 25
+    Top = 56
+    Width = 110
+    ItemHeight = 17
+    ItemIndex = 0
+    Items.Strings = (
+      'None'
+      'Scatter Plot'
+      'Bar Chart'
+      'Box Plot'
+    )
+    ReadOnly = True
+    Style = csDropDownList
+    TabOrder = 21
+    Text = 'None'
+    OnChange = DataChartTypeCBChange
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'

@@ -14,6 +14,7 @@ type
 
   TMainForm = class(TForm)
     AddInterClassBtn: TButton;
+    DataChartTypeCB: TComboBox;
     InterClassCB: TComboBox;
     InterChartXAxisImg: TImage;
     InterChartYAxisImg: TImage;
@@ -41,10 +42,7 @@ type
     SymbolsImage: TImage;
     ShowLineCheckBox: TCheckBox;
     DMSize: TLabel;
-    ScatterPlotTB: TToggleBox;
-    BarChartTB: TToggleBox;
     StatisticsStringGrid: TStringGrid;
-    BoxPlotTB: TToggleBox;
     XYCOLlBtn: TButton;
     DataChartLineSeries1: TLineSeries;
     DataChart: TChart;
@@ -58,8 +56,10 @@ type
 
 
     //Static Chart
+    procedure DataChartTypeCBChange(Sender: TObject);
     function LoadCSVFileToMatrix(root: string): TDoubleMatrix;
     procedure ExportDataToCSVFile();
+    procedure DisableDCExtraElements();
     procedure LoadMainData(doubleMatrix: TDoubleMatrix);
     procedure GenerateScatterPlot();
     procedure GenerateBarChart();
@@ -79,6 +79,7 @@ type
     procedure GenerateInterPoint(x,y:Integer);
     procedure EraseInterPoint(xCol, yCol: double);
     procedure EnableInterFormElements();
+    procedure GetStaticChartComboBoxValue();
 
     //Funciones
     function GetMean(doubleArray: TDoubleArray): double;
@@ -137,16 +138,14 @@ var
   SORTEDMATRIX: array of array of integer;
   DATATAG, CLASSARRAY: array of integer;
   DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW, IXRange, IYRange: integer;
-  CURRENTGRAPH: string;
+  CURRENTGRAPH: string; // CURRENTGRAPH ['NONE', 'SCATTERPLOT', 'BARCHART', 'BOXPLOT', 'INTERACTIVE']
+
   CLASSCOLORS: array of TColor;
 
 implementation
 {$R *.lfm}
 
 { TMainForm }
-
-
-
 
 //-------------------------- Valores de inicio ------------------------------//
 procedure TMainForm.FormCreate(Sender: TObject);
@@ -305,6 +304,112 @@ begin
     CloseFile(full_file);
   end;
 end;
+
+// DC = DataChart
+procedure TMainForm.DisableDCExtraElements();
+begin
+  ShowLineCheckBox.Visible := False;
+  ClasesCheckBox.Visible := False;
+end;
+
+//Obtiene el valor de DataChartTypeCB y le asigna el valor correspondiente a CURRENTGRAPH
+procedure TMainForm.GetStaticChartComboBoxValue();
+begin
+  DisableDCExtraElements();
+  XValueEdit.Enabled:= True;
+  YValueEdit.Enabled:= True;
+  XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+  YValueEdit.Text := IntToStr(YCOLINDEX + 1);
+  case DataChartTypeCB.Text of
+    'None':
+    begin
+      CURRENTGRAPH := 'NONE';
+    end;
+    'Scatter Plot':
+    begin
+      CURRENTGRAPH := 'SCATTERPLOT';
+      ShowLineCheckBox.Visible := True;
+    end;
+    'Bar Chart':
+    begin
+      CURRENTGRAPH := 'BARCHART';
+      ClasesCheckBox.Visible := True;
+      YValueEdit.Enabled:= False;
+      if (ClasesCheckBox.Checked) then
+        XValueEdit.Enabled:= False;
+    end;
+    'Box Plot':
+    begin
+      CURRENTGRAPH := 'BOXPLOT';
+      XValueEdit.Enabled:= False;
+      YValueEdit.Enabled:= False;
+    end;
+  end;
+  UpdateDataChart();
+end;
+
+
+
+{
+procedure TMainForm.BarChartTBChange(Sender: TObject);
+begin
+  if BarChartTB.Checked = True then
+  begin
+    ScatterPlotTB.Checked := False;
+    BoxPlotTB.Checked := False;
+    ClasesCheckBox.Visible := True;
+    if ClasesCheckBox.Checked then
+    begin
+      XValueEdit.Enabled := False;
+      XValueEdit.Text := '';
+      YValueEdit.Enabled := False;
+      YValueEdit.Text := '';
+    end
+    else
+    begin
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Enabled := False;
+      YValueEdit.Text := '';
+    end;
+
+    CURRENTGRAPH := 'BARCHART';
+    UpdateDataChart();
+  end
+  else
+  begin
+    if (ScatterPlotTB.Checked = False) and (BoxPlotTB.Checked = False) then
+      BarChartTB.Checked := True
+    else
+    begin
+      XValueEdit.Enabled := True;
+      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+      YValueEdit.Enabled := True;
+      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
+      ClasesCheckBox.Visible := False;
+    end;
+
+  end;
+end;
+
+procedure TMainForm.BoxPlotTBChange(Sender: TObject);
+begin
+  if BoxPlotTB.Checked = True then
+  begin
+    ScatterPlotTB.Checked := False;
+    BarChartTB.Checked := False;
+    CURRENTGRAPH := 'BOXPLOT';
+    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
+    UpdateDataChart();
+  end
+  else
+  begin
+    if (ScatterPlotTB.Checked = False) and (BarChartTB.Checked = False) then
+      BoxPlotTB.Checked := True;
+
+  end;
+end;}
+
 
 
 procedure TMainForm.ExportDataToCSVFile();
@@ -652,7 +757,8 @@ begin
   DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
 
   EnableStaticFormElements();
-  CURRENTGRAPH := 'SCATTERPLOT';
+  DataChartTypeCB.ItemIndex := 1;
+  GetStaticChartComboBoxValue();
   UpdateDataChart();
   except
         On e: ERangeError do
@@ -931,13 +1037,9 @@ end;
 
 procedure TMainForm.EnableStaticFormElements();
 begin
-   XYCOLlBtn.Enabled := True;
-  ScatterPlotTB.Checked := False;
-  ScatterPlotTB.Enabled := True;
-  BarChartTB.Checked := False;
-  BarChartTB.Enabled := True;
-  BoxPlotTB.Checked := False;
-  BoxPlotTB.Enabled := True;
+  DataChartTypeCB.ItemIndex := 1;
+  XYCOLlBtn.Enabled := True;
+  DataChartTypeCB.Enabled := True;
   DeleteRowBtn.Enabled := True;
   TesterBtn.Enabled := True;
   XValueEdit.Enabled := True;
@@ -945,7 +1047,6 @@ begin
   CurrentRowEdit.Enabled := True;
   SaveDataMenuItem.Enabled := True;
 end;
-
 procedure TMainForm.EnableInterFormElements();
 begin
   XYCOLlBtn.Enabled := True;
@@ -964,12 +1065,8 @@ end;
 procedure TMainForm.DisableFormElements();
 begin
    XYCOLlBtn.Enabled := False;
-  ScatterPlotTB.Checked := False;
-  ScatterPlotTB.Enabled := False;
-  BarChartTB.Checked := False;
-  BarChartTB.Enabled := False;
-  BoxPlotTB.Checked := False;
-  BoxPlotTB.Enabled := False;
+   DataChartTypeCB.ItemIndex := 0;
+   DataChartTypeCB.Enabled := False;
   DeleteRowBtn.Enabled := False;
   TesterBtn.Enabled := False;
   XValueEdit.Enabled := False;
@@ -1404,118 +1501,45 @@ end;
 
 procedure TMainForm.ShowLineCheckBoxChange(Sender: TObject);
 begin
-  UpdateDataChart();
+  GetStaticChartComboBoxValue();
 end;
 
 
 
 procedure TMainForm.ClasesCheckBoxChange(Sender: TObject);
 begin
-  if ClasesCheckBox.Checked then
-  begin
-    YValueEdit.Enabled := False;
-    YValueEdit.Text := '';
-    XValueEdit.Enabled := False;
-    XValueEdit.Text := '';
-  end
-  else
-  begin
-    YValueEdit.Enabled := False;
-    YValueEdit.Text := '';
-    XValueEdit.Enabled := True;
-    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-  end;
-  UpdateDataChart();
-
+  GetStaticChartComboBoxValue();
 end;
-
-
-
-procedure TMainForm.ScatterPlotTBChange(Sender: TObject);
-begin
-  if ScatterPlotTB.Checked = True then
-  begin
-    BarChartTB.Checked := False;
-    BoxPlotTB.Checked := False;
-    ShowLineCheckBox.Visible := True;
-    CURRENTGRAPH := 'SCATTERPLOT';
-    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-    UpdateDataChart();
-  end
-  else
-  begin
-    if (BarChartTB.Checked = False) and (BoxPlotTB.Checked = False) then
-      ScatterPlotTB.Checked := True
-    else
-      ShowLineCheckBox.Visible := False;
-
-  end;
-end;
-
 
 procedure TMainForm.BarChartTBChange(Sender: TObject);
 begin
-  if BarChartTB.Checked = True then
-  begin
-    ScatterPlotTB.Checked := False;
-    BoxPlotTB.Checked := False;
-    ClasesCheckBox.Visible := True;
-    if ClasesCheckBox.Checked then
-    begin
-      XValueEdit.Enabled := False;
-      XValueEdit.Text := '';
-      YValueEdit.Enabled := False;
-      YValueEdit.Text := '';
-    end
-    else
-    begin
-      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-      YValueEdit.Enabled := False;
-      YValueEdit.Text := '';
-    end;
 
-    CURRENTGRAPH := 'BARCHART';
-    UpdateDataChart();
-  end
-  else
-  begin
-    if (ScatterPlotTB.Checked = False) and (BoxPlotTB.Checked = False) then
-      BarChartTB.Checked := True
-    else
-    begin
-      XValueEdit.Enabled := True;
-      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-      YValueEdit.Enabled := True;
-      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-      ClasesCheckBox.Visible := False;
-    end;
-
-  end;
 end;
 
-procedure TMainForm.BoxPlotTBChange(Sender: TObject);
+procedure TMainForm.ScatterPlotTBChange(Sender: TObject);
 begin
-  if BoxPlotTB.Checked = True then
-  begin
-    ScatterPlotTB.Checked := False;
-    BarChartTB.Checked := False;
-    CURRENTGRAPH := 'BOXPLOT';
-    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-    UpdateDataChart();
-  end
-  else
-  begin
-    if (ScatterPlotTB.Checked = False) and (BarChartTB.Checked = False) then
-      BoxPlotTB.Checked := True;
 
-  end;
 end;
+
+
+procedure TMainForm.DataChartTypeCBChange(Sender: TObject);
+begin
+  GetStaticChartComboBoxValue();
+end;
+
+
+
+
+
 
 procedure TMainForm.TesterBtnClick(Sender: TObject);
 begin
      TesterForm.ShowModal;
+end;
+
+procedure TMainForm.BoxPlotTBChange(Sender: TObject);
+begin
+
 end;
 
 procedure TMainForm.FormActivate(Sender: TObject);
