@@ -18,7 +18,8 @@ type
     InterChartXAxisImg: TImage;
     InterChartYAxisImg: TImage;
     InterChartCanvasImg: TImage;
-    CreateInteractiveChart: TMenuItem;
+    InterChartMenuItem: TMenuItem;
+    SaveDataMenuItem: TMenuItem;
     TesterBtn: TButton;
     ClearDataBtn: TButton;
     CurrentRowEdit: TEdit;
@@ -58,11 +59,13 @@ type
 
     //Static Chart
     function LoadCSVFileToMatrix(root: string): TDoubleMatrix;
+    procedure ExportDataToCSVFile();
     procedure LoadMainData(doubleMatrix: TDoubleMatrix);
     procedure GenerateScatterPlot();
     procedure GenerateBarChart();
     procedure EnableStaticFormElements();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
+    procedure SaveDataMenuItemClick(Sender: TObject);
     procedure SortColumn(colIndex: integer);
     function SortedMatrixToArray(colIndex: integer): TDoubleArray;
     function SortedMatrixRealValue(i, j: integer): double;
@@ -97,7 +100,7 @@ type
 
     //Eventos
     procedure AddInterClassBtnClick(Sender: TObject);
-    procedure CreateInteractiveChartClick(Sender: TObject);
+    procedure InterChartMenuItemClick(Sender: TObject);
     procedure FormActivate(Sender: TObject);
     procedure InterChartCanvasImgMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: integer);
     procedure TesterBtnClick(Sender: TObject);
@@ -301,6 +304,59 @@ begin
   finally
     CloseFile(full_file);
   end;
+end;
+
+
+procedure TMainForm.ExportDataToCSVFile();
+var
+  i, j: integer;
+  fileName, currentLine: string;
+  txtFile: TextFile;
+begin
+  fileName := 'A1_Name_Example';
+  if InputQuery('Save File', 'File name:', fileName) then
+    if not (Length(fileName) = 0) then
+    begin
+      if not (Length(DATAMATRIX) = 0) then
+      begin
+        try
+          try
+            //Se crea el archivo dentro de la carpeta data_sets con el nombre que escogio el ususario
+            AssignFile(txtFile, 'data_sets/' + fileName + '.txt');
+            //Se borra el contenido si existe y se reinicia el apuntador para WriteLn
+            Rewrite(txtFile);
+            //Se obtiene un string con los valores de etiquetas y se agrega al archivo de texto
+            currentLine := '';
+            for j := 0 to DMCOLSIZE - 1 do
+              currentLine += IntToStr(DATATAG[j]) + ',';
+            currentLine += IntToStr(DATATAG[DMCOLSIZE]);
+            WriteLn(txtFile, currentLine);
+
+            //Se crean strings para cada fila con su respectivo valor de clase y se agregan al archivo de texto
+            for i := 0 to DMROWSIZE - 1 do
+            begin
+              currentLine := '';
+              for j := 0 to DMCOLSIZE - 1 do
+                currentLine += FloatToStr(DATAMATRIX[i, j]) + ',';
+              currentLine += IntToStr(CLASSARRAY[i]);
+              WriteLn(txtFile, currentLine);
+            end;
+          finally
+            CloseFile(txtFile);
+          end;
+        except
+          on e1: EFOpenError do
+            ShowMessage(e1.Message);
+          on e2: EInOutError do
+            ShowMessage(e2.Message);
+        end;
+      end
+      else
+        ShowMessage('no data');
+    end
+    else
+      ShowMessage('no file name');
+
 end;
 
 procedure TMainForm.LoadInteractiveChart();
@@ -641,25 +697,30 @@ begin
     begin
       HideChartElement('interactive');
       ShowChartElement('static');
-      GenerateScatterPlot();
+      if not (Length(DATAMATRIX) = 0) then
+        GenerateScatterPlot();
     end;
     'BARCHART':
     begin
       HideChartElement('interactive');
       ShowChartElement('static');
-      GenerateBarChart();
+      if not (Length(DATAMATRIX) = 0) then
+        GenerateBarChart();
     end;
     'BOXPLOT':
     begin
       HideChartElement('interactive');
       ShowChartElement('static');
-      j := 0;
-      for i := 0 to DMCOLSIZE - 1 do
+      if not (Length(DATAMATRIX) = 0) then
       begin
-        if (DATATAG[i] = 0) then
+        j := 0;
+        for i := 0 to DMCOLSIZE - 1 do
         begin
-          GenerateBoxPlot(i, j);
-          j += 1;
+          if (DATATAG[i] = 0) then
+          begin
+            GenerateBoxPlot(i, j);
+            j += 1;
+          end;
         end;
       end;
     end;
@@ -832,6 +893,11 @@ begin
     Q3, Max, '', RandomRGB(60, 90, 60, 140, 150, 150));
 end;
 
+procedure TMainForm.SaveDataMenuItemClick(Sender: TObject);
+begin
+  ExportDataToCSVFile();
+end;
+
 //-------------------------Limpiar Datos-------------------------------//
 procedure TMainForm.ClearData();
 begin
@@ -877,6 +943,7 @@ begin
   XValueEdit.Enabled := True;
   YValueEdit.Enabled := True;
   CurrentRowEdit.Enabled := True;
+  SaveDataMenuItem.Enabled := True;
 end;
 
 procedure TMainForm.EnableInterFormElements();
@@ -889,6 +956,7 @@ begin
   AddInterClassBtn.Enabled := True;
   DeleteRowBtn.Enabled := True;
   CurrentRowEdit.Enabled := True;
+  SaveDataMenuItem.Enabled := True;
 end;
 
 
@@ -909,6 +977,7 @@ begin
   CurrentRowEdit.Enabled := False;
   InterClassCB.Enabled := False;
   AddInterClassBtn.Enabled := False;
+  SaveDataMenuItem.Enabled := False;
 end;
 
 
@@ -1469,7 +1538,7 @@ end;
 
 
 
-procedure TMainForm.CreateInteractiveChartClick(Sender: TObject);
+procedure TMainForm.InterChartMenuItemClick(Sender: TObject);
 begin
   LoadInteractiveChart();
 end;

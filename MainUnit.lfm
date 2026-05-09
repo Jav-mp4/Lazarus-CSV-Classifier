@@ -354,12 +354,16 @@ object MainForm: TMainForm
     object MenuItem1: TMenuItem
       Caption = 'Load File'
       object LoadCSVMenuItem: TMenuItem
-        Caption = 'CSV'
+        Caption = 'Load CSV'
         OnClick = LoadCSVMenuItemClick
       end
-      object CreateInteractiveChart: TMenuItem
+      object InterChartMenuItem: TMenuItem
         Caption = 'Interactive Chart'
-        OnClick = CreateInteractiveChartClick
+        OnClick = InterChartMenuItemClick
+      end
+      object SaveDataMenuItem: TMenuItem
+        Caption = 'Save Data'
+        OnClick = SaveDataMenuItemClick
       end
     end
   end
