@@ -14,7 +14,13 @@ type
 
   TMainForm = class(TForm)
     AddInterClassBtn: TButton;
+    NewMinMaxLabel: TLabel;
+    NewMinEdit: TEdit;
+    NewMaxEdit: TEdit;
+    NormalizeTypeCB: TComboBox;
+    NormalizeColBtn: TButton;
     DataChartTypeCB: TComboBox;
+    CurrentColEdit: TEdit;
     InterClassCB: TComboBox;
     InterChartXAxisImg: TImage;
     InterChartYAxisImg: TImage;
@@ -56,7 +62,6 @@ type
 
 
     //Static Chart
-    procedure DataChartTypeCBChange(Sender: TObject);
     function LoadCSVFileToMatrix(root: string): TDoubleMatrix;
     procedure ExportDataToCSVFile();
     procedure DisableDCExtraElements();
@@ -65,11 +70,12 @@ type
     procedure GenerateBarChart();
     procedure EnableStaticFormElements();
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
-    procedure SaveDataMenuItemClick(Sender: TObject);
+    procedure NormalizeTypeCBChange(Sender: TObject);
     procedure SortColumn(colIndex: integer);
     function SortedMatrixToArray(colIndex: integer): TDoubleArray;
     function SortedMatrixRealValue(i, j: integer): double;
     function Discretization(colIndex: integer): TDoubleMatrix;
+    procedure SynchDataChartTypeValues();
 
     //Interactive Chart 
     procedure LoadInteractiveChart();
@@ -79,13 +85,15 @@ type
     procedure GenerateInterPoint(x,y:Integer);
     procedure EraseInterPoint(xCol, yCol: double);
     procedure EnableInterFormElements();
-    procedure GetStaticChartComboBoxValue();
 
-    //Funciones
+    //Funciones 
+    procedure UpdateDataChart();
+    procedure SynchNormalizeTypeValues();
     function GetMean(doubleArray: TDoubleArray): double;
     function GetMedian(sortedDoubleArray: TDoubleArray): double;
     function GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
     function GetColMinMaxValues(colIndex: integer): TDoubleArray;
+    procedure NormalizeCol();
     procedure MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
     procedure GetStats();
     procedure UpdateDataStringGridValues();
@@ -100,12 +108,14 @@ type
     function RandomRGB(RMin, RMax, GMin, GMax, BMin, BMax: integer): TColor;
 
     //Eventos
+    procedure DataChartTypeCBChange(Sender: TObject);
+    procedure NormalizeColBtnClick(Sender: TObject);
+    procedure SaveDataMenuItemClick(Sender: TObject);
     procedure AddInterClassBtnClick(Sender: TObject);
     procedure InterChartMenuItemClick(Sender: TObject);
     procedure FormActivate(Sender: TObject);
     procedure InterChartCanvasImgMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: integer);
     procedure TesterBtnClick(Sender: TObject);
-    procedure BoxPlotTBChange(Sender: TObject);
     procedure ClearDataBtnClick(Sender: TObject);
     procedure DataStringGridPrepareCanvas(Sender: TObject; aCol, aRow: integer; aState: TGridDrawState);
     procedure DataStringGridSelection(Sender: TObject; aCol, aRow: integer);
@@ -114,7 +124,6 @@ type
     procedure DeleteRowBtnClick(Sender: TObject);
     procedure DownScrollBtnClick(Sender: TObject);
     procedure LeftScrollBtnClick(Sender: TObject);
-    procedure UpdateDataChart();
     procedure ClasesCheckBoxChange(Sender: TObject);
     procedure BarChartTBChange(Sender: TObject);
     procedure ScatterPlotTBChange(Sender: TObject);
@@ -137,7 +146,7 @@ var
   DATAMATRIX, STATSMATRIX: TDoubleMatrix;
   SORTEDMATRIX: array of array of integer;
   DATATAG, CLASSARRAY: array of integer;
-  DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW, IXRange, IYRange: integer;
+  DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW,SELECTEDCOL, IXRange, IYRange: integer;
   CURRENTGRAPH: string; // CURRENTGRAPH ['NONE', 'SCATTERPLOT', 'BARCHART', 'BOXPLOT', 'INTERACTIVE']
 
   CLASSCOLORS: array of TColor;
@@ -177,39 +186,7 @@ end;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>FUNCIONES>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
 
-//Se obtiene el valor minimo y el maximo de la columna  TDoubleArray[0] = minimo,  TDoubleArray[1] = maximo
-function TMainForm.GetColMinMaxValues(colIndex: integer): TDoubleArray;
-var
-  i: integer;
-  //doubleArray[0] = minimo,  doubleArray[1] = maximo
-  doubleArray: TDoubleArray;
-begin
-  SetLength(doubleArray, DMROWSIZE);
-  if not (Length(DATAMATRIX) = 0) then
-  begin
-    doubleArray[0] := DATAMATRIX[0, colIndex];
-    doubleArray[1] := DATAMATRIX[0, colIndex];
-    for i := 0 to Length(doubleArray) - 1 do
-    begin
-      if (DATAMATRIX[i, colIndex] <= doubleArray[0]) then
-        doubleArray[0] := DATAMATRIX[i, colIndex]
-      else
-        doubleArray[1] := DATAMATRIX[i, colIndex];
-    end;
-    Result := doubleArray;
-  end
-  else
-    raise ERangeError.Create('datamatrix is empty');
-end;
 
-procedure TMainForm.MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
-var
-  i: integer;
-begin
-  //Se realiza la nomralizacion min-max en cada valor de la columna colIndex
-  for i := 0 to DMROWSIZE-1 do
-      DATAMATRIX[i, colIndex] := ( (DATAMATRIX[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
-end;
 
 
 procedure TMainForm.UpdateDataStringGridValues();
@@ -313,7 +290,7 @@ begin
 end;
 
 //Obtiene el valor de DataChartTypeCB y le asigna el valor correspondiente a CURRENTGRAPH
-procedure TMainForm.GetStaticChartComboBoxValue();
+procedure TMainForm.SynchDataChartTypeValues();
 begin
   DisableDCExtraElements();
   XValueEdit.Enabled:= True;
@@ -347,70 +324,6 @@ begin
   end;
   UpdateDataChart();
 end;
-
-
-
-{
-procedure TMainForm.BarChartTBChange(Sender: TObject);
-begin
-  if BarChartTB.Checked = True then
-  begin
-    ScatterPlotTB.Checked := False;
-    BoxPlotTB.Checked := False;
-    ClasesCheckBox.Visible := True;
-    if ClasesCheckBox.Checked then
-    begin
-      XValueEdit.Enabled := False;
-      XValueEdit.Text := '';
-      YValueEdit.Enabled := False;
-      YValueEdit.Text := '';
-    end
-    else
-    begin
-      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-      YValueEdit.Enabled := False;
-      YValueEdit.Text := '';
-    end;
-
-    CURRENTGRAPH := 'BARCHART';
-    UpdateDataChart();
-  end
-  else
-  begin
-    if (ScatterPlotTB.Checked = False) and (BoxPlotTB.Checked = False) then
-      BarChartTB.Checked := True
-    else
-    begin
-      XValueEdit.Enabled := True;
-      XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-      YValueEdit.Enabled := True;
-      YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-      ClasesCheckBox.Visible := False;
-    end;
-
-  end;
-end;
-
-procedure TMainForm.BoxPlotTBChange(Sender: TObject);
-begin
-  if BoxPlotTB.Checked = True then
-  begin
-    ScatterPlotTB.Checked := False;
-    BarChartTB.Checked := False;
-    CURRENTGRAPH := 'BOXPLOT';
-    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-    UpdateDataChart();
-  end
-  else
-  begin
-    if (ScatterPlotTB.Checked = False) and (BarChartTB.Checked = False) then
-      BoxPlotTB.Checked := True;
-
-  end;
-end;}
-
-
 
 procedure TMainForm.ExportDataToCSVFile();
 var
@@ -467,6 +380,8 @@ end;
 procedure TMainForm.LoadInteractiveChart();
 begin
   ClearData();
+  DataChartTypeCB.ItemIndex := 0;
+  SynchDataChartTypeValues();
   DisableFormElements();
   TesterForm.ClearTestData();
   EnableInterFormElements();
@@ -758,7 +673,7 @@ begin
 
   EnableStaticFormElements();
   DataChartTypeCB.ItemIndex := 1;
-  GetStaticChartComboBoxValue();
+  SynchDataChartTypeValues();
   UpdateDataChart();
   except
         On e: ERangeError do
@@ -999,9 +914,9 @@ begin
     Q3, Max, '', RandomRGB(60, 90, 60, 140, 150, 150));
 end;
 
-procedure TMainForm.SaveDataMenuItemClick(Sender: TObject);
+procedure TMainForm.NormalizeTypeCBChange(Sender: TObject);
 begin
-  ExportDataToCSVFile();
+  SynchNormalizeTypeValues();
 end;
 
 //-------------------------Limpiar Datos-------------------------------//
@@ -1218,6 +1133,16 @@ begin
       UpScrollBtn.Top + UpScrollBtn.Height - VerticalBarlBtn.Height;
 end;
 
+//Checar si un index esta dentro del rango
+function TMainForm.IsInsideRange(index: integer; range: integer): boolean;
+begin
+  if (0 < index) and (index <= range) then
+    Result := True
+  else
+    Result := False;
+end;
+
+
 //Borrar una fila
 procedure TMainForm.DeleteRow();
 var
@@ -1288,6 +1213,113 @@ begin
     on e2: ERangeError do
       ShowMessage(e2.Message);
   end;
+end;
+
+procedure TMainForm.SynchNormalizeTypeValues();
+begin
+  NewMinEdit.Visible := False;
+      NewMaxEdit.Visible := False;
+      NewMinMaxLabel.Visible := False;
+  case NormalizeTypeCB.Text of
+    'Min-Max':
+    begin
+      NewMinEdit.Visible := True;
+      NewMaxEdit.Visible := True;
+      NewMinMaxLabel.Visible := True;
+    end;
+    'Z-Score':
+    begin
+    end;
+    'Decimal Scaling':
+    begin;
+    end;
+  end;
+end;
+
+procedure TMainForm.NormalizeCol();
+var
+  //Norm = Normalizar
+  colIndex, i, j: integer;
+  minMaxValues : TDoubleArray;
+  newMin, newMax: Double;
+begin
+  //Se comprueba que el indice exista
+  try
+  if (IsInsideRange(StrToInt(CurrentColEdit.Text), DMCOLSIZE)) then
+  begin
+    colIndex := StrToInt(CurrentColEdit.Text)-1;
+    if (DATATAG[colIndex - 1] = 0) then
+    begin
+      case NormalizeTypeCB.Text of
+          'Min-Max':
+          begin
+            newMin := StrToFloat(NewMinEdit.Text);
+            newMax := StrToFloat(NewMaxEdit.Text);
+            if (newMin < newMax) then
+            begin
+              minMaxValues := GetColMinMaxValues(colIndex);
+              MinMaxDMCol(colIndex, minMaxValues[0], minMaxValues[1], newMin, newMax);
+              UpdateDataStringGridValues();
+            end
+            else
+              raise  ERangeError.Create('invalid range');
+          end;
+          'Z-Score':
+        begin
+
+        end;
+        'Decimal Scaling':
+        begin
+
+        end;
+      end;
+    end
+    else
+     raise  EConvertError.Create('invalid column type');
+  end
+  else
+   raise  ERangeError.Create('invalid index');
+  except
+    on e1: EConvertError do
+      ShowMessage(e1.Message);
+    on e2: ERangeError do
+      ShowMessage(e2.Message);
+  end;
+end;
+
+
+//Se obtiene el valor minimo y el maximo de la columna  TDoubleArray[0] = minimo,  TDoubleArray[1] = maximo
+function TMainForm.GetColMinMaxValues(colIndex: integer): TDoubleArray;
+var
+  i: integer;
+  //minMaxValues[0] = minimo,  minMaxValues[1] = maximo
+  minMaxValues: TDoubleArray;
+begin
+  SetLength(minMaxValues, 2);
+  if not (Length(DATAMATRIX) = 0) then
+  begin
+    minMaxValues[0] := DATAMATRIX[0, colIndex];
+    minMaxValues[1] := DATAMATRIX[0, colIndex];
+    for i := 0 to DMROWSIZE - 1 do
+    begin
+      if (DATAMATRIX[i, colIndex] < minMaxValues[0]) then
+        minMaxValues[0] := DATAMATRIX[i, colIndex];
+      if (DATAMATRIX[i, colIndex] > minMaxValues[1]) then
+        minMaxValues[1] := DATAMATRIX[i, colIndex];
+    end;
+    Result := minMaxValues;
+  end
+  else
+    raise ERangeError.Create('datamatrix is empty');
+end;
+
+procedure TMainForm.MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+var
+  i: integer;
+begin
+  //Se realiza la nomralizacion min-max en cada valor de la columna colIndex
+  for i := 0 to DMROWSIZE-1 do
+      DATAMATRIX[i, colIndex] := ( (DATAMATRIX[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
 end;
 
 procedure TMainForm.ShowChartElement(elementToShow: string);
@@ -1384,14 +1416,17 @@ begin
       end;
       'INTERACTIVE':
       begin
-        oldIXRange := IXRange;
-        oldIYRange := IYRange;
-        IXRange := StrToInt(XValueEdit.Text);
-        IYRange := StrToInt(YValueEdit.Text);
-        GenerateInteractiveChartAxisLines();
-        MinMaxDMCol(0, 0, oldIXRange, 0, IXRange);
-        MinMaxDMCol(1, 0, oldIYRange, 0, IYRange);
-        UpdateDataStringGridValues();
+        if not (StrToInt(XValueEdit.Text) = 0) and not (StrToInt(YValueEdit.Text) = 0) then
+        begin
+          oldIXRange := IXRange;
+          oldIYRange := IYRange;
+          IXRange := StrToInt(XValueEdit.Text);
+          IYRange := StrToInt(YValueEdit.Text);
+          GenerateInteractiveChartAxisLines();
+          MinMaxDMCol(0, 0, oldIXRange, 0, IXRange);
+          MinMaxDMCol(1, 0, oldIYRange, 0, IYRange);
+          UpdateDataStringGridValues();
+        end;
       end;
     end;
   except
@@ -1460,6 +1495,8 @@ procedure TMainForm.DataStringGridSelection(Sender: TObject; aCol, aRow: integer
 begin
   DataStringPositionChange();
   SELECTEDROW := DataStringGrid.Row-1;
+  SELECTEDCOL := DataStringGrid.Col;
+  CurrentColEdit.Text := IntToStr(SELECTEDCOL + 1);
   CurrentRowEdit.Text := IntToStr(SELECTEDROW + 1);
   DataStringGrid.Invalidate;
   RowNumberStringGrid.Invalidate;
@@ -1501,14 +1538,14 @@ end;
 
 procedure TMainForm.ShowLineCheckBoxChange(Sender: TObject);
 begin
-  GetStaticChartComboBoxValue();
+  SynchDataChartTypeValues();
 end;
 
 
 
 procedure TMainForm.ClasesCheckBoxChange(Sender: TObject);
 begin
-  GetStaticChartComboBoxValue();
+  SynchDataChartTypeValues();
 end;
 
 procedure TMainForm.BarChartTBChange(Sender: TObject);
@@ -1524,7 +1561,7 @@ end;
 
 procedure TMainForm.DataChartTypeCBChange(Sender: TObject);
 begin
-  GetStaticChartComboBoxValue();
+  SynchDataChartTypeValues();
 end;
 
 
@@ -1537,21 +1574,18 @@ begin
      TesterForm.ShowModal;
 end;
 
-procedure TMainForm.BoxPlotTBChange(Sender: TObject);
-begin
-
-end;
 
 procedure TMainForm.FormActivate(Sender: TObject);
 begin
-  //Para probar TesterUnit
+  ///Cargar elementos para prueba de TesterUnit//
   {TesterForm.ShowModal;}
-  //Cargar archivo automaticamente para pruebas//
-  LoadInteractiveChart();
-  {XCOLINDEX := 0;
+  //Cargar elementos para prueba de Interactive Chart//
+  {LoadInteractiveChart();}
+  //Cargar elementos para prueba de Static Chart//
+  XCOLINDEX := 0;
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));}
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
 end;
 
 procedure TMainForm.InterChartCanvasImgMouseDown(Sender: TObject;
@@ -1606,19 +1640,23 @@ end;
 
 
 
-function TMainForm.IsInsideRange(index: integer; range: integer): boolean;
-begin
-  if (0 < index) and (index <= range) then
-    Result := True
-  else
-    Result := False;
-end;
 
 
 procedure TMainForm.XYCOLlBtnClick(Sender: TObject);
 begin
   HandleXYValues();
 end;
+
+procedure TMainForm.NormalizeColBtnClick(Sender: TObject);
+begin
+  NormalizeCol();
+end;
+
+procedure TMainForm.SaveDataMenuItemClick(Sender: TObject);
+begin
+  ExportDataToCSVFile();
+end;
+
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EVENTOS<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
 

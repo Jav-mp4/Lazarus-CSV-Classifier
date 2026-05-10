@@ -220,7 +220,7 @@ object MainForm: TMainForm
     Cursor = crHandPoint
     Left = 896
     Height = 26
-    Top = 40
+    Top = 39
     Width = 48
     Caption = 'Delete'
     TabOrder = 14
@@ -260,6 +260,7 @@ object MainForm: TMainForm
     Top = 40
     Width = 32
     Alignment = taCenter
+    NumbersOnly = True
     TabOrder = 17
   end
   object XYTitleLabel: TLabel
@@ -334,6 +335,64 @@ object MainForm: TMainForm
     TabOrder = 21
     Text = 'None'
     OnChange = DataChartTypeCBChange
+  end
+  object NormalizeColBtn: TButton
+    Left = 1008
+    Height = 26
+    Top = 39
+    Width = 72
+    Caption = 'Normalize'
+    TabOrder = 22
+    OnClick = NormalizeColBtnClick
+  end
+  object CurrentColEdit: TEdit
+    Left = 968
+    Height = 25
+    Top = 40
+    Width = 32
+    NumbersOnly = True
+    TabOrder = 23
+  end
+  object NormalizeTypeCB: TComboBox
+    Left = 970
+    Height = 25
+    Top = 8
+    Width = 110
+    ItemHeight = 17
+    ItemIndex = 0
+    Items.Strings = (
+      'Min-Max'
+      'Z-Score'
+      'Decimal Scaling'
+    )
+    ReadOnly = True
+    Style = csDropDownList
+    TabOrder = 24
+    Text = 'Min-Max'
+    OnChange = NormalizeTypeCBChange
+  end
+  object NewMinEdit: TEdit
+    Left = 1088
+    Height = 25
+    Top = 39
+    Width = 32
+    NumbersOnly = True
+    TabOrder = 25
+  end
+  object NewMaxEdit: TEdit
+    Left = 1128
+    Height = 25
+    Top = 39
+    Width = 32
+    NumbersOnly = True
+    TabOrder = 26
+  end
+  object NewMinMaxLabel: TLabel
+    Left = 1093
+    Height = 17
+    Top = 20
+    Width = 63
+    Caption = 'Min    Max'
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'
