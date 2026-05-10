@@ -95,6 +95,8 @@ type
     function GetColMinMaxValues(colIndex: integer): TDoubleArray;
     procedure NormalizeCol();
     procedure MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+    procedure ZScoreDMCol(colIndex: integer);
+    procedure DecimalScalingDMCol(colIndex: integer);
     procedure GetStats();
     procedure UpdateDataStringGridValues();
     procedure DisableFormElements();
@@ -1240,17 +1242,17 @@ procedure TMainForm.NormalizeCol();
 var
   //Norm = Normalizar
   colIndex, i, j: integer;
-  minMaxValues : TDoubleArray;
-  newMin, newMax: Double;
+  minMaxValues: TDoubleArray;
+  newMin, newMax: double;
 begin
   //Se comprueba que el indice exista
   try
-  if (IsInsideRange(StrToInt(CurrentColEdit.Text), DMCOLSIZE)) then
-  begin
-    colIndex := StrToInt(CurrentColEdit.Text)-1;
-    if (DATATAG[colIndex - 1] = 0) then
+    if (IsInsideRange(StrToInt(CurrentColEdit.Text), DMCOLSIZE)) then
     begin
-      case NormalizeTypeCB.Text of
+      colIndex := StrToInt(CurrentColEdit.Text) - 1;
+      if (DATATAG[colIndex - 1] = 0) then
+      begin
+        case NormalizeTypeCB.Text of
           'Min-Max':
           begin
             newMin := StrToFloat(NewMinEdit.Text);
@@ -1259,26 +1261,26 @@ begin
             begin
               minMaxValues := GetColMinMaxValues(colIndex);
               MinMaxDMCol(colIndex, minMaxValues[0], minMaxValues[1], newMin, newMax);
-              UpdateDataStringGridValues();
             end
             else
               raise  ERangeError.Create('invalid range');
           end;
           'Z-Score':
-        begin
-
+          begin
+            ZScoreDMCol(colIndex);
+          end;
+          'Decimal Scaling':
+          begin
+            DecimalScalingDMCol(colIndex);
+          end;
         end;
-        'Decimal Scaling':
-        begin
-
-        end;
-      end;
+        UpdateDataStringGridValues();
+      end
+      else
+        raise  EConvertError.Create('invalid column type');
     end
     else
-     raise  EConvertError.Create('invalid column type');
-  end
-  else
-   raise  ERangeError.Create('invalid index');
+      raise  ERangeError.Create('invalid index');
   except
     on e1: EConvertError do
       ShowMessage(e1.Message);
@@ -1317,9 +1319,37 @@ procedure TMainForm.MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMa
 var
   i: integer;
 begin
-  //Se realiza la nomralizacion min-max en cada valor de la columna colIndex
+  //Se realiza la normalizacion min-max en cada valor de la columna colIndex
   for i := 0 to DMROWSIZE-1 do
       DATAMATRIX[i, colIndex] := ( (DATAMATRIX[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
+end;
+
+procedure TMainForm.ZScoreDMCol(colIndex: integer);
+var
+  i: integer;
+begin
+  //Se realiza la normalizacion z-score en cada valor de la columna colIndex
+  for i := 0 to DMROWSIZE-1 do
+      DATAMATRIX[i, colIndex] := (DATAMATRIX[i, colIndex] - STATSMATRIX[0,colIndex]) / STATSMATRIX[2,colIndex];
+end;
+
+procedure TMainForm.DecimalScalingDMCol(colIndex: integer);
+var
+  i, digitNum: integer;
+  maxAbsolute: double;
+begin
+  //Se obtiene el valor absoluto maximo en la columna
+  maxAbsolute := DATAMATRIX[0, colIndex];
+  for i := 0 to DMROWSIZE - 1 do
+  begin
+    if Abs(DATAMATRIX[i, colIndex]) > maxAbsolute then
+      maxAbsolute := Abs(DATAMATRIX[i, colIndex]);
+  end;
+  //Obtiene numero de digitos
+  digitNum := floor(Log10(maxAbsolute) + 1);
+  //Formula Decimal Scaling
+  for i := 0 to DMROWSIZE - 1 do
+    DATAMATRIX[i, colIndex] := DATAMATRIX[i, colIndex] / Power(10, digitNum);
 end;
 
 procedure TMainForm.ShowChartElement(elementToShow: string);
