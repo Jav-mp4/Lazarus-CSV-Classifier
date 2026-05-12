@@ -72,10 +72,10 @@ type
     procedure GenerateBoxPlot(ColIndex: integer; boxplotNum: integer);
     procedure NormalizeTypeCBChange(Sender: TObject);
     procedure SortColumn(colIndex: integer);
+    procedure SynchDataChartTypeValues();
     function SortedMatrixToArray(colIndex: integer): TDoubleArray;
     function SortedMatrixRealValue(i, j: integer): double;
     function Discretization(colIndex: integer): TDoubleMatrix;
-    procedure SynchDataChartTypeValues();
 
     //Interactive Chart 
     procedure LoadInteractiveChart();
@@ -1607,15 +1607,15 @@ end;
 
 procedure TMainForm.FormActivate(Sender: TObject);
 begin
-  ///Cargar elementos para prueba de TesterUnit//
-  {TesterForm.ShowModal;}
-  //Cargar elementos para prueba de Interactive Chart//
-  {LoadInteractiveChart();}
   //Cargar elementos para prueba de Static Chart//
   XCOLINDEX := 0;
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  ///Cargar elementos para prueba de TesterUnit//
+  TesterForm.ShowModal;
+  //Cargar elementos para prueba de Interactive Chart//
+  {LoadInteractiveChart();}
 end;
 
 procedure TMainForm.InterChartCanvasImgMouseDown(Sender: TObject;

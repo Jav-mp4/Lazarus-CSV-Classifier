@@ -8,6 +8,7 @@ object TesterForm: TTesterForm
   ClientWidth = 1128
   DesignTimePPI = 106
   LCLVersion = '4.4.0.0'
+  OnActivate = FormActivate
   OnCreate = FormCreate
   object ClassifierTypeCB: TComboBox
     Left = 632
@@ -185,7 +186,7 @@ object TesterForm: TTesterForm
     Left = 776
     Height = 25
     Top = 16
-    Width = 110
+    Width = 118
     AutoSelect = False
     ItemHeight = 17
     ItemIndex = 0
@@ -237,5 +238,13 @@ object TesterForm: TTesterForm
     Top = 72
     Width = 149
     Caption = 'Accuracy = 0     Error = 0'
+  end
+  object FoldsNumberEdit: TEdit
+    Left = 864
+    Height = 25
+    Top = 48
+    Width = 32
+    NumbersOnly = True
+    TabOrder = 15
   end
 end

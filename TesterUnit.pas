@@ -14,6 +14,7 @@ type
 
   TTesterForm = class(TForm)
     AddTestDataBtn: TButton;
+    FoldsNumberEdit: TEdit;
     PerformanceLabel: TLabel;
     TestChartBarSeries1: TBarSeries;
     TestChart: TChart;
@@ -35,6 +36,7 @@ type
     //Funciones
     procedure EvaluateBtnClick(Sender: TObject);
     procedure ClassificationBtnClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
     procedure UpdateTestVisual();
     procedure LoadTesterData(doubleMatrix: TDoubleMatrix);
     procedure DataStringPositionChange();
@@ -50,6 +52,7 @@ type
     procedure UpdatePerformanceVisual();
     function ApplyNaiveBayes(rowIndex: integer): Integer;
     function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
+    procedure ApplyKFold();
 
 
     //Eventos
@@ -175,7 +178,7 @@ end;
 procedure TTesterForm.InitialValues();
 begin
   SetLength(TMCLASSRESULTS, TMROWSIZE);
-  SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.CLASSARRAY[Length(MainUnit.CLASSARRAY)-1]);
+  SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1]);
   TestChartBarSeries1.Clear;
   TMCURRENTSTATUS := 'NOT_CLASSIFIED';
   SELECTEDROW := 0;
@@ -183,56 +186,176 @@ end;
 
 procedure TTesterForm.EvaluateClassifier();
 var
-  i, j, f, folds, foldCorrect ,foldTotal: integer;
+  i: integer;
 begin
   case EvaluationTypeCB.Text of
     'K-Fold':
     begin
-      folds := 5;
-      foldCorrect := 0;
-      foldTotal := 0;
-      if (MainUnit.DMROWSIZE > 5) then
-      begin
-        //Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
-        TMROWSIZE := (MainUnit.DMROWSIZE div folds);
-        TMCOLSIZE := MainUnit.DMCOLSIZE;
-        //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
-        SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
-        for f := 1 to folds do
-        begin
-          IGNORESTART := (TMROWSIZE * f) - TMROWSIZE;
-          IGNOREEND := (TMROWSIZE * f) - 1;
-          for i := 0 to TMROWSIZE - 1 do
-            for j := 0 to TMCOLSIZE - 1 do
-              TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART + i, j];
-          ;
-          //Se asignan los valores reales de clase en TMREALCLASS
-          SetLength(TMREALCLASS, TMROWSIZE);
-          for i := 0 to TMROWSIZE - 1 do
-            TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
-          TSHASCLASS := True;
-          //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
-          InitialValues();
-          TMCURRENTSTATUS := 'EVALUATING';
-          UpdateStringGrids();
-          ClassifyTestSet();
-          //Se suman los aciertos y numero de elementos de todos los folds
-          PerformanceAnalysis();
-          foldCorrect += ECORRECT;
-          foldTotal += ETOTAL;
-        end;
-        //Se obtiene el valor real de exactitud y error
-        ECORRECT := foldCorrect;
-        ETOTAL := foldTotal;
-        UpdatePerformanceVisual();
-      end
-      else
-          showmessage('Trainig set is smaller than k');
+      ApplyKFold();
     end;
     'other':
       ShowMessage('other');
   end;
 end;
+
+procedure TTesterForm.ApplyKFold();
+var
+  //C = Class
+  i, j, f, c, m, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex: integer;
+  //foldsMatrix = indices que forman parte de cada fold, classSortedMatrix = indices pertenecientes a cada clase
+  foldsMatrix, classSortedMatrix: array of array of integer;
+  maxRowsPerClass, classRowsUsed: array of integer;
+  classPercentage: TDoubleArray;
+begin
+  try
+    //Se obtiene el numero de folds
+    foldNum := StrToInt(FoldsNumberEdit.Text);
+    //Se confirma que el rango es valido
+    if (0 < foldNum) and (foldNum < MainUnit.DMROWSIZE) then
+    begin
+      totalC := MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1];
+
+      //Se obtiene el tamaño para cada fold
+      SetLength(foldsMatrix, foldNum);
+      foldRowCount := MainUnit.DMROWSIZE div foldNum;
+      remaider := MainUnit.DMROWSIZE mod foldNum;
+      //Se reparte el sobrante sumandole 1 a los primeros folds hasta que se tenga espacio para todos los elementos de DATAMATRIX
+      for f := 0 to foldNum - 1 do
+      begin
+        if (remaider > 0) then
+        begin
+          SetLength(foldsMatrix[f], foldRowCount + 1);
+          remaider -= 1;
+        end
+        else
+          SetLength(foldsMatrix[f], foldRowCount);
+      end;
+
+      //Se cuentan ocurrencias de cada clase y se separan todos los valores segun su clase
+      SetLength(classPercentage, totalC);
+      SetLength(classSortedMatrix, totalC);
+      for c := 0 to totalC-1 do
+        classPercentage[c] := 0;
+      for i := 0 to MainUnit.DMROWSIZE - 1 do
+      begin
+        //Sumador de recurrencia de clase
+        classPercentage[MainUnit.CLASSARRAY[i]] += 1;
+        //Se asigna el indice actual a la fila de classSortedMatrix que representa a su clase
+        SetLength(classSortedMatrix[MainUnit.CLASSARRAY[i]], Length(classSortedMatrix[MainUnit.CLASSARRAY[i]])+1);
+        classSortedMatrix[MainUnit.CLASSARRAY[i],Length(classSortedMatrix[MainUnit.CLASSARRAY[i]])-1] := i;
+      end;
+
+      SetLength(maxRowsPerClass, totalC);
+      SetLength(classRowsUsed, totalC);
+      for c := 0 to totalC - 1 do
+      begin
+        //Cada suma de ocurrencia de cada clase es dividida entre el total de elementos
+        classPercentage[c] := classPercentage[c] / MainUnit.DMROWSIZE;
+        //Se obtiene la cantidad de elementos en cada fold de cada clase, manteniendo la proporcion de clase encontrada en DATAMATRIX
+        maxRowsPerClass[c] := Ceil(classPercentage[c] * foldRowCount);
+      end;
+
+      for c := 0 to totalC-1 do
+        showmessage(inttostr(c)+' '+inttostr(maxRowsPerClass[0]));
+
+
+      //Se asignan proporcionalmente los indices a cada fold
+      //Recorre cada fold
+      for f := 0 to foldNum - 1 do
+      begin
+        //Se reestablece a 0 el uso de clase en el fold actual
+        for c := 0 to totalC - 1 do
+          classRowsUsed[c] := maxRowsPerClass[c];
+        //Recorre cada espacio disponible en el fold actual
+        for i := 0 to Length(foldsMatrix[f]) - 1 do
+          //Se recorre cada clase y se intenta meter un elemento de la misma
+          for c := 0 to totalC - 1 do
+          begin
+            //Si classSortedMatrix no esta vacia y no se a rebasado el limite de elementos por clase se añade un elemento aleatorio
+            if not (Length(classSortedMatrix[c]) = 0) and not (classRowsUsed[c] = 0) then
+            begin
+              rowIndex := random(Length(classSortedMatrix[c]));
+              foldsMatrix[f, i] := classSortedMatrix[c, rowIndex];
+              classRowsUsed[c] -= 1;
+              //Se recorren los indices para eliminar el valor usado
+              for j := rowIndex to Length(classSortedMatrix[c]) - 2 do
+                classSortedMatrix[c, j] := classSortedMatrix[c, j + 1];
+              SetLength(classSortedMatrix[c], Length(classSortedMatrix[c]) - 1);
+              Break;
+            end;
+          end;
+      end;
+
+
+
+       //CORREGIR classSortedMatrix PARA QUE TODOS LOS INDICES SEAN USADOS
+
+      TestDataStringGrid.RowCount := 1;
+      TestDataStringGrid.ColCount := foldNum;
+      for f := 0 to foldNum-1 do
+      begin
+          if (Length(foldsMatrix[f])+1 > TestDataStringGrid.RowCount) then
+             TestDataStringGrid.RowCount := Length(foldsMatrix[f])+1;
+          for i := 0 to Length(foldsMatrix[f])-1 do
+          begin
+            TestDataStringGrid.Cells[f, i+1] := inttostr(foldsMatrix[f, i]);
+            //showmessage(foldsMatrix[f, i]);
+          end;
+      end;
+
+      {for f := 0 to foldNum-1 do
+       for i := 0 to Length(foldsMatrix[f])-1 do
+         showmessage('fold: '+inttostr(f)+' value: '+inttostr(foldsMatrix[f,i]));}
+
+
+
+
+      foldCorrect := 1;
+      foldTotal := 1;
+      {//Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
+      TMROWSIZE := (MainUnit.DMROWSIZE div foldNum);
+      TMCOLSIZE := MainUnit.DMCOLSIZE;
+      //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
+      SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
+      for f := 1 to foldNum do
+      begin
+        IGNORESTART := (TMROWSIZE * f) - TMROWSIZE;
+        IGNOREEND := (TMROWSIZE * f) - 1;
+        for i := 0 to TMROWSIZE - 1 do
+          for j := 0 to TMCOLSIZE - 1 do
+            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART + i, j];
+        ;
+        //Se asignan los valores reales de clase en TMREALCLASS
+        SetLength(TMREALCLASS, TMROWSIZE);
+        for i := 0 to TMROWSIZE - 1 do
+          TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
+        TSHASCLASS := True;
+        //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
+        InitialValues();
+        TMCURRENTSTATUS := 'EVALUATING';
+        UpdateStringGrids();
+        ClassifyTestSet();
+        //Se suman los aciertos y numero de elementos de todos los folds
+        PerformanceAnalysis();
+        foldCorrect += ECORRECT;
+        foldTotal += ETOTAL;
+      end;
+      //Se obtiene el valor real de exactitud y error}
+      ECORRECT := foldCorrect;
+      ETOTAL := foldTotal;
+      UpdatePerformanceVisual();
+    end
+    else
+      ShowMessage('invalid k');
+
+  except
+    on e1: EConvertError do
+      ShowMessage(e1.Message);
+    on e2: ERangeError do
+      ShowMessage(e2.Message);
+  end;
+end;
+
 
 procedure TTesterForm.UpdateStringGrids();
 var
@@ -306,9 +429,9 @@ function TTesterForm.ApplyNaiveBayes(rowIndex: integer): Integer;
 var
   //C = Clase
   i, j, currentC, totalC, sameValueNum: integer;
-  cMatchIndex: array of integer;
-  ColCProb, cElements: TDoubleArray;
-  mean, deviation, cProbInDM: double;
+  currentClassRows: array of integer;
+  ColCProb, numericalValues: TDoubleArray;
+  mean, deviation, currentCProbInDM: double;
 begin
   totalC := MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1];
   //Arreglo del porcentaje en cada columna para la clase actual
@@ -317,18 +440,19 @@ begin
   for currentC := 0 to totalC - 1 do
   begin
     //Encuentra los indices que son de la clase siendo evaluada actualmente
-    SetLength(cMatchIndex, 0);
-    for i := 0 to MainUnit.DMROWSIZE-1 do
+    SetLength(currentClassRows, 0);
+    currentCProbInDM := 0;
+    for i := 0 to MainUnit.DMROWSIZE - 1 do
     begin
-      if (i < IGNORESTART) or (i > IGNOREEND) then
+      if (MainUnit.CLASSARRAY[i] = currentC) then
       begin
-        if (MainUnit.CLASSARRAY[i] = currentC) then
-        begin
-          SetLength(cMatchIndex, Length(cMatchIndex) + 1);
-          cMatchIndex[Length(cMatchIndex) - 1] := i;
-        end;
+        SetLength(currentClassRows, Length(currentClassRows) + 1);
+        currentClassRows[Length(currentClassRows) - 1] := i;
+        currentCProbInDM += 1;
       end;
     end;
+    //Se obtiene la probabilidad de clase
+    currentCProbInDM := currentCProbInDM / Length(MainUnit.CLASSARRAY);
     //Recorre todas las columnas
     for j := 0 to TMCOLSIZE - 1 do
     begin
@@ -336,39 +460,43 @@ begin
       if (MainUnit.DATATAG[j] = 0) then
       begin
         //Se obtienen todos los elementos de esta columna que pertenecen a la clase currentC
-        SetLength(cElements, 0);
-        for i := 0 to Length(cMatchIndex) - 1 do
+        SetLength(numericalValues, 0);
+        for i := 0 to Length(currentClassRows) - 1 do
         begin
-            SetLength(cElements, Length(cElements) + 1);
-            cElements[Length(cElements) - 1] := MainUnit.DATAMATRIX[cMatchIndex[i], j];
+            SetLength(numericalValues, Length(numericalValues) + 1);
+            numericalValues[Length(numericalValues) - 1] := MainUnit.DATAMATRIX[currentClassRows[i], j];
         end;
         //Si hay por lo menos un elemento que pertenece a la clase se evalua
-        if not (Length(cElements) = 0) then
+        if not (Length(numericalValues) = 0) then
         begin
-          mean := MainForm.GetMean(cElements);
-          deviation := MainForm.GetStandarDev(cElements, mean);
+          mean := MainForm.GetMean(numericalValues);
+          deviation := MainForm.GetStandarDev(numericalValues, mean);
           //Se evita error si la desviacion estandar es igual a 0
           if (deviation = 0) then
             ColCProb[j] := 1e-308
           else
             ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((TESTMATRIX[rowIndex, j] - mean), 2) / (2 * Power(deviation, 2))));
-        end;
+        end
+        else
+          //Si no hay elementos de la clase actual se le da probabilidad 0
+          ColCProb[j] := 0;
       end
       //Evaluacion si la columna es de tipo Nominal
       else
       begin
+        //Cuenta cuantas columnas de la clase actual tienen el mismo valor que la fila siendo evaluada
         sameValueNum := 0;
-        for i := 0 to Length(cMatchIndex) - 1 do
+        for i := 0 to Length(currentClassRows) - 1 do
         begin
-            if ( MainUnit.DATAMATRIX[cMatchIndex[i], j] = TESTMATRIX[rowIndex, j]) then
+            if ( MainUnit.DATAMATRIX[currentClassRows[i], j] = TESTMATRIX[rowIndex, j]) then
                begin
                sameValueNum += 1;
                end;
         end;
-        if (Length(cMatchIndex) = 0) then
+        if (Length(currentClassRows) = 0) then
           ColCProb[j] := 0
         else
-          ColCProb[j] := sameValueNum / Length(cMatchIndex);
+          ColCProb[j] := sameValueNum / Length(currentClassRows);
       //Si el valor es 0 se le asigna 1e-4 para evitar que anule los demas al multiplicar
       end;
       if (ColCProb[j] = 0) then
@@ -385,12 +513,7 @@ begin
           TMCLASSPERCENT[rowIndex, currentC] := 1e-308;
     end;
     //Se multiplica por la probabilidad de clase
-    cProbInDM := 0;
-    for i := 0 to MainUnit.DMROWSIZE-1 do
-      if (MainUnit.CLASSARRAY[i] = currentC) then
-        cProbInDM += 1;
-    cProbInDM := cProbInDM / Length(MainUnit.CLASSARRAY);
-    TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * cProbInDM;
+    TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * currentCProbInDM;
   end;
   result := SelectMaxProbClass(TMCLASSPERCENT[rowIndex]);
 end;
@@ -489,6 +612,7 @@ begin
   end;
 end;
 
+//Actualiza la grafica de barras que muestra porcentaje de clase
 procedure TTesterForm.UpdateTestGraph();
 var
   j: Integer;
@@ -501,7 +625,8 @@ begin
   TestChartBarSeries1.Marks.Frame.Visible := False;
   for j := 0 to Length(TMCLASSPERCENT[0]) - 1 do
   begin
-    TestChartBarSeries1.AddXY(j, Round(TMCLASSPERCENT[SELECTEDROW, j]*Power(10,20))/(Power(10,20)), IntToStr(j), MainForm.RandomRGB(60, 90, 60, 140, 150, 150));
+    //Se redondea para evitar numeros demasiado pequeños ya que TCharBart no acepta tamaños como 1E-300
+    TestChartBarSeries1.AddXY(j, Round(TMCLASSPERCENT[SELECTEDROW, j]*Power(10,10))/(Power(10,10)), IntToStr(j), MainForm.RandomRGB(60, 90, 60, 140, 150, 150));
   end;
 end;
 procedure TTesterForm.ClearTestData();
@@ -563,6 +688,11 @@ end;
 procedure TTesterForm.ClassificationBtnClick(Sender: TObject);
 begin
   ClassifyTestSet();
+end;
+
+procedure TTesterForm.FormActivate(Sender: TObject);
+begin
+   LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
 end;
 
 procedure TTesterForm.EvaluateBtnClick(Sender: TObject);
