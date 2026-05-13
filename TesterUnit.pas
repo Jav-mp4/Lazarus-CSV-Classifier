@@ -50,7 +50,7 @@ type
     procedure UpdateStringGrids();
     procedure UpdateTestGraph();
     procedure UpdatePerformanceVisual();
-    function ApplyNaiveBayes(rowIndex: integer): Integer;
+    function ApplyNaiveBayes(TrainingSetIndexes: Array of Integer; testRow: TDoubleArray; testRowIndex: Integer): Integer;
     function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
     procedure ApplyKFold();
 
@@ -201,13 +201,15 @@ end;
 procedure TTesterForm.ApplyKFold();
 var
   //C = Class
-  i, j, f, c, m, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex: integer;
+  i, j, f, c, k, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex: integer;
   //foldsMatrix = indices que forman parte de cada fold, classSortedMatrix = indices pertenecientes a cada clase
   foldsMatrix, classSortedMatrix: array of array of integer;
   maxRowsPerClass, classRowsUsed: array of integer;
   classPercentage: TDoubleArray;
+  foundIndex: Boolean;
 begin
   try
+    //------------------------Se obtiene una matrix en la que cada i contiene los indices de cada fold---------------------//
     //Se obtiene el numero de folds
     foldNum := StrToInt(FoldsNumberEdit.Text);
     //Se confirma que el rango es valido
@@ -255,10 +257,6 @@ begin
         maxRowsPerClass[c] := Ceil(classPercentage[c] * foldRowCount);
       end;
 
-      for c := 0 to totalC-1 do
-        showmessage(inttostr(c)+' '+inttostr(maxRowsPerClass[0]));
-
-
       //Se asignan proporcionalmente los indices a cada fold
       //Recorre cada fold
       for f := 0 to foldNum - 1 do
@@ -268,7 +266,9 @@ begin
           classRowsUsed[c] := maxRowsPerClass[c];
         //Recorre cada espacio disponible en el fold actual
         for i := 0 to Length(foldsMatrix[f]) - 1 do
+        begin
           //Se recorre cada clase y se intenta meter un elemento de la misma
+          foundIndex := False;
           for c := 0 to totalC - 1 do
           begin
             //Si classSortedMatrix no esta vacia y no se a rebasado el limite de elementos por clase se añade un elemento aleatorio
@@ -281,66 +281,60 @@ begin
               for j := rowIndex to Length(classSortedMatrix[c]) - 2 do
                 classSortedMatrix[c, j] := classSortedMatrix[c, j + 1];
               SetLength(classSortedMatrix[c], Length(classSortedMatrix[c]) - 1);
+              foundIndex := True;
+              //ShowMessage(BoolToStr(foundIndex, True));
               Break;
             end;
           end;
+          //Si no se encontro ningun indice debido al limite por clase se asigna el primer disponible
+          if not (foundIndex) then
+            //Se recorren todos los indices de classSortedMatrix hasta encontrar alguno disponible
+            for c := 0 to totalC - 1 do
+              if not (foundIndex) then
+              begin
+                for k := 0 to Length(classSortedMatrix[c]) - 1 do
+                begin
+                  foldsMatrix[f, i] := classSortedMatrix[c, k];
+                  //Se recorren los indices para eliminar el valor usado
+                  for j := k to Length(classSortedMatrix[c]) - 2 do
+                    classSortedMatrix[c, j] := classSortedMatrix[c, j + 1];
+                  SetLength(classSortedMatrix[c], Length(classSortedMatrix[c]) - 1);
+                  foundIndex := True;
+                  break;
+                end;
+              end
+              else
+                break;
+        end;
       end;
 
 
 
-       //CORREGIR classSortedMatrix PARA QUE TODOS LOS INDICES SEAN USADOS
-
-      TestDataStringGrid.RowCount := 1;
+      {TestDataStringGrid.RowCount := 1;
       TestDataStringGrid.ColCount := foldNum;
-      for f := 0 to foldNum-1 do
+      for f := 0 to foldNum - 1 do
       begin
-          if (Length(foldsMatrix[f])+1 > TestDataStringGrid.RowCount) then
-             TestDataStringGrid.RowCount := Length(foldsMatrix[f])+1;
-          for i := 0 to Length(foldsMatrix[f])-1 do
-          begin
-            TestDataStringGrid.Cells[f, i+1] := inttostr(foldsMatrix[f, i]);
-            //showmessage(foldsMatrix[f, i]);
-          end;
-      end;
+        if (Length(foldsMatrix[f]) + 1 > TestDataStringGrid.RowCount) then
+          TestDataStringGrid.RowCount := Length(foldsMatrix[f]) + 1;
+        for i := 0 to Length(foldsMatrix[f]) - 1 do
+          TestDataStringGrid.Cells[f, i + 1] := IntToStr(foldsMatrix[f, i]);;
+      end;}
 
-      {for f := 0 to foldNum-1 do
-       for i := 0 to Length(foldsMatrix[f])-1 do
-         showmessage('fold: '+inttostr(f)+' value: '+inttostr(foldsMatrix[f,i]));}
-
-
+      SetLength(TESTMATRIX, MainUnit.DMROWSIZE, MainUnit.DMCOLSIZE);
+      showmessage(inttostr(MainUnit.DMROWSIZE)+' '+inttostr(MainUnit.DMCOLSIZE));
+      i := 0;
+      for f := 0 to foldNum - 1 do
+        for j := 0 to Length(foldsMatrix[f]) - 1 do
+        begin
+          showmessage(inttostr(foldsMatrix[f, j]));
+          TESTMATRIX[i] := MainUnit.DATAMATRIX[foldsMatrix[f, j]];
+          i += 1;
+        end;
+      UpdateStringGrids();
 
 
       foldCorrect := 1;
       foldTotal := 1;
-      {//Se obtiene el tamaño de cada fold de acuerdo a K y el tamaño de DATAMATRIX
-      TMROWSIZE := (MainUnit.DMROWSIZE div foldNum);
-      TMCOLSIZE := MainUnit.DMCOLSIZE;
-      //Se llena TESTMATRIX con los valores de el fold que esta siendo evaluado
-      SetLength(TESTMATRIX, TMROWSIZE, TMCOLSIZE);
-      for f := 1 to foldNum do
-      begin
-        IGNORESTART := (TMROWSIZE * f) - TMROWSIZE;
-        IGNOREEND := (TMROWSIZE * f) - 1;
-        for i := 0 to TMROWSIZE - 1 do
-          for j := 0 to TMCOLSIZE - 1 do
-            TESTMATRIX[i, j] := MainUnit.DATAMATRIX[IGNORESTART + i, j];
-        ;
-        //Se asignan los valores reales de clase en TMREALCLASS
-        SetLength(TMREALCLASS, TMROWSIZE);
-        for i := 0 to TMROWSIZE - 1 do
-          TMREALCLASS[i] := MainUnit.CLASSARRAY[i];
-        TSHASCLASS := True;
-        //Se actualizan StringGrids y se empieza la clasificacion de TESTMATRIX
-        InitialValues();
-        TMCURRENTSTATUS := 'EVALUATING';
-        UpdateStringGrids();
-        ClassifyTestSet();
-        //Se suman los aciertos y numero de elementos de todos los folds
-        PerformanceAnalysis();
-        foldCorrect += ECORRECT;
-        foldTotal += ETOTAL;
-      end;
-      //Se obtiene el valor real de exactitud y error}
       ECORRECT := foldCorrect;
       ETOTAL := foldTotal;
       UpdatePerformanceVisual();
@@ -398,6 +392,7 @@ end;
 procedure TTesterForm.ClassifyTestSet();
 var
   i, j: integer;
+  DMIndexes: Array of Integer;
 begin
   if not (TMCURRENTSTATUS = 'EVALUATING') then
   begin
@@ -408,10 +403,15 @@ begin
     'Naive Bayes':
     begin
       SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1]);
-      for i := 0 to TMROWSIZE - 1 do
+      //Se agregan los indices de todos los elementos en DATAMATRIX
+      SetLength(DMIndexes, MainUnit.DMROWSIZE);
+      for j := 0 to MainUnit.DMROWSIZE - 1 do
+        DMIndexes[j] := j;
+      //Recorre todas las filas en TESTMATRIX para aplicarles Naive Bayes
+      for i := 0 to Length(TESTMATRIX) - 1 do
       begin
         //Se aplica el algoritmo para todos los elementos
-        TMCLASSRESULTS[i] := ApplyNaiveBayes(i);
+        TMCLASSRESULTS[i] := ApplyNaiveBayes(DMIndexes, TESTMATRIX[i], i);
         ClassStringGrid.Cells[0, i + 1] := IntToStr(TMCLASSRESULTS[i]);
       end;
       TMCURRENTSTATUS := 'CLASSIFIED';
@@ -425,11 +425,11 @@ end;
 
 
 //Aplica el algoritmo Naive Bayes para encontrar la clase
-function TTesterForm.ApplyNaiveBayes(rowIndex: integer): Integer;
+function TTesterForm.ApplyNaiveBayes(TrainingSetIndexes:Array of Integer; testRow: TDoubleArray; testRowIndex: Integer): Integer;
 var
   //C = Clase
   i, j, currentC, totalC, sameValueNum: integer;
-  currentClassRows: array of integer;
+  currentClassIndexes: array of integer;
   ColCProb, numericalValues: TDoubleArray;
   mean, deviation, currentCProbInDM: double;
 begin
@@ -439,32 +439,32 @@ begin
   ////Recorre todas las clases
   for currentC := 0 to totalC - 1 do
   begin
-    //Encuentra los indices que son de la clase siendo evaluada actualmente
-    SetLength(currentClassRows, 0);
+    //Encuentra los indices en DATAMATRIX que son de la clase siendo evaluada actualmente
+    SetLength(currentClassIndexes, 0);
     currentCProbInDM := 0;
-    for i := 0 to MainUnit.DMROWSIZE - 1 do
+    for i := 0 to Length(TrainingSetIndexes) - 1 do
     begin
-      if (MainUnit.CLASSARRAY[i] = currentC) then
+      if (MainUnit.CLASSARRAY[TrainingSetIndexes[i]] = currentC) then
       begin
-        SetLength(currentClassRows, Length(currentClassRows) + 1);
-        currentClassRows[Length(currentClassRows) - 1] := i;
+        SetLength(currentClassIndexes, Length(currentClassIndexes) + 1);
+        currentClassIndexes[Length(currentClassIndexes) - 1] := TrainingSetIndexes[i];
         currentCProbInDM += 1;
       end;
     end;
     //Se obtiene la probabilidad de clase
-    currentCProbInDM := currentCProbInDM / Length(MainUnit.CLASSARRAY);
+    currentCProbInDM := currentCProbInDM / Length(TrainingSetIndexes);
     //Recorre todas las columnas
-    for j := 0 to TMCOLSIZE - 1 do
+    for j := 0 to MainUnit.DMCOLSIZE - 1 do
     begin
       //Evaluacion si la columna es de tipo Continuo
       if (MainUnit.DATATAG[j] = 0) then
       begin
         //Se obtienen todos los elementos de esta columna que pertenecen a la clase currentC
         SetLength(numericalValues, 0);
-        for i := 0 to Length(currentClassRows) - 1 do
+        for i := 0 to Length(currentClassIndexes) - 1 do
         begin
             SetLength(numericalValues, Length(numericalValues) + 1);
-            numericalValues[Length(numericalValues) - 1] := MainUnit.DATAMATRIX[currentClassRows[i], j];
+            numericalValues[Length(numericalValues) - 1] := MainUnit.DATAMATRIX[currentClassIndexes[i], j];
         end;
         //Si hay por lo menos un elemento que pertenece a la clase se evalua
         if not (Length(numericalValues) = 0) then
@@ -475,7 +475,7 @@ begin
           if (deviation = 0) then
             ColCProb[j] := 1e-308
           else
-            ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((TESTMATRIX[rowIndex, j] - mean), 2) / (2 * Power(deviation, 2))));
+            ColCProb[j] := (1 / (Sqrt(2 * Pi) * deviation)) * Exp(-(Power((testRow[j] - mean), 2) / (2 * Power(deviation, 2))));
         end
         else
           //Si no hay elementos de la clase actual se le da probabilidad 0
@@ -486,37 +486,39 @@ begin
       begin
         //Cuenta cuantas columnas de la clase actual tienen el mismo valor que la fila siendo evaluada
         sameValueNum := 0;
-        for i := 0 to Length(currentClassRows) - 1 do
+        for i := 0 to Length(currentClassIndexes) - 1 do
         begin
-            if ( MainUnit.DATAMATRIX[currentClassRows[i], j] = TESTMATRIX[rowIndex, j]) then
+            if ( MainUnit.DATAMATRIX[currentClassIndexes[i], j] = testRow[j]) then
                begin
                sameValueNum += 1;
                end;
         end;
-        if (Length(currentClassRows) = 0) then
+        if (Length(currentClassIndexes) = 0) then
           ColCProb[j] := 0
         else
-          ColCProb[j] := sameValueNum / Length(currentClassRows);
+          ColCProb[j] := sameValueNum / Length(currentClassIndexes);
       //Si el valor es 0 se le asigna 1e-4 para evitar que anule los demas al multiplicar
       end;
       if (ColCProb[j] = 0) then
           ColCProb[j] := 1e-308;
     end;
     //Se agrega valor neutro de multiplicacion
-    TMCLASSPERCENT[rowIndex, currentC] := 1;
+    TMCLASSPERCENT[i, currentC] := 1;
     //Se obtiene la probabilidad conjunta de todas las probabilidades de atributo
     for j := 0 to TMCOLSIZE - 1 do
     begin
-      TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * ColCProb[j];
+      TMCLASSPERCENT[i, currentC] := TMCLASSPERCENT[i, currentC] * ColCProb[j];
       //Si el valor es demasiado pequeño se regresa a el limite de 1e-200 para que el programa no lo convierta en 0
-      if (TMCLASSPERCENT[rowIndex, currentC] < 1e-308) then
-          TMCLASSPERCENT[rowIndex, currentC] := 1e-308;
+      if (TMCLASSPERCENT[i, currentC] < 1e-308) then
+          TMCLASSPERCENT[i, currentC] := 1e-308;
     end;
     //Se multiplica por la probabilidad de clase
-    TMCLASSPERCENT[rowIndex, currentC] := TMCLASSPERCENT[rowIndex, currentC] * currentCProbInDM;
+    TMCLASSPERCENT[i, currentC] := TMCLASSPERCENT[i, currentC] * currentCProbInDM;
   end;
-  result := SelectMaxProbClass(TMCLASSPERCENT[rowIndex]);
+  result := SelectMaxProbClass(TMCLASSPERCENT[i]);
 end;
+
+
 
 function TtesterForm.SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
 var
@@ -716,7 +718,6 @@ procedure TTesterForm.TestDataStringGridPrepareCanvas(Sender: TObject; aCol, aRo
 begin
   if (aRow = SELECTEDROW + 1) then
     TestDataStringGrid.Canvas.Brush.Color := RGBToColor(226, 226, 226);
-
 end;
 
 procedure TTesterForm.TestDataStringGridSelection(Sender: TObject; aCol, aRow: integer);
