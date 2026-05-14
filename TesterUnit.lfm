@@ -1,10 +1,10 @@
 object TesterForm: TTesterForm
   Left = 353
-  Height = 501
+  Height = 540
   Top = 250
   Width = 1128
   Caption = 'Tester'
-  ClientHeight = 501
+  ClientHeight = 540
   ClientWidth = 1128
   DesignTimePPI = 106
   LCLVersion = '4.4.0.0'
@@ -246,5 +246,15 @@ object TesterForm: TTesterForm
     Width = 32
     NumbersOnly = True
     TabOrder = 15
+  end
+  object KFoldStatsStringGrid: TStringGrid
+    Left = 632
+    Height = 48
+    Top = 472
+    Width = 210
+    ColCount = 3
+    DefaultColWidth = 70
+    ScrollBars = ssNone
+    TabOrder = 16
   end
 end

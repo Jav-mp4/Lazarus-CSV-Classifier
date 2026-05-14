@@ -16,6 +16,7 @@ type
     AddTestDataBtn: TButton;
     FoldsNumberEdit: TEdit;
     PerformanceLabel: TLabel;
+    KFoldStatsStringGrid: TStringGrid;
     TestChartBarSeries1: TBarSeries;
     TestChart: TChart;
     EvaluateBtn: TButton;
@@ -181,6 +182,7 @@ begin
   SetLength(TMCLASSRESULTS, TMROWSIZE);
   SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1]);
   TestChartBarSeries1.Clear;
+  KFoldStatsStringGrid.Clear;
   TMCURRENTSTATUS := 'NOT_CLASSIFIED';
   SELECTEDROW := 0;
 end;
@@ -202,11 +204,12 @@ end;
 procedure TTesterForm.ApplyKFold();
 var
   //C = Class
-  i, j, f, c, k, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex, ignorefold, TMIndex: integer;
+  i, j, f, c, k, foldNum, foldRowCount, remaider, totalC, rowIndex, ignorefold, TMIndex: integer;
   //foldsMatrix = indices que forman parte de cada fold, classSortedMatrix = indices pertenecientes a cada clase
   foldsMatrix, classSortedMatrix: array of array of integer;
-  maxRowsPerClass, classRowsUsed, trainingSetIndexes: array of integer;
+  maxRowsPerClass, classRowsUsed, trainingSetIndexes, foldSucceses: array of integer;
   classPercentage: TDoubleArray;
+  error, accuracy: Double;
   foundIndex: Boolean;
 begin
   try
@@ -312,9 +315,6 @@ begin
         end;
       end;
 
-
-       
-
       //Muestra indices de cada fold
       TestDataStringGrid.RowCount := 1;
       TestDataStringGrid.ColCount := foldNum;
@@ -328,15 +328,20 @@ begin
 
 
       //Se agregan todos los elementos en el orden en que fueron evaluados para mostrarse en TestDataStringGrid
-        SetLength(TESTMATRIX, MainUnit.DMROWSIZE, MainUnit.DMCOLSIZE);
-        i := 0;
-        for f := 0 to foldNum - 1 do
-          for j := 0 to Length(foldsMatrix[f]) - 1 do
-          begin
-            TESTMATRIX[i] := MainUnit.DATAMATRIX[foldsMatrix[f, j]];
-            i += 1;
-          end;
-        UpdateStringGrids();
+      SetLength(TESTMATRIX, MainUnit.DMROWSIZE, MainUnit.DMCOLSIZE);
+      i := 0;
+      for f := 0 to foldNum - 1 do
+        for j := 0 to Length(foldsMatrix[f]) - 1 do
+        begin
+          TESTMATRIX[i] := MainUnit.DATAMATRIX[foldsMatrix[f, j]];
+          i += 1;
+        end;
+      UpdateStringGrids();
+
+      //Se reestablece el conteo de aciertos por fold
+      SetLength(foldSucceses, foldNum);
+      for f := 0 to foldNum-1 do
+        foldSucceses[f] := 0;
 
       //Recorre todos los fold apartando el actual y usando el resto como conjunto de entrenamiento
       TMIndex := 0;
@@ -361,24 +366,38 @@ begin
           end;
         end;
         //Se evaluan los indices en ignorefold usando como conjunto de entrenamiento a trainingSetIndexes
+        SetLength(TMREALCLASS, TMROWSIZE);
         for i := 0 to Length(foldsMatrix[ignorefold]) - 1 do
         begin
           TMCLASSRESULTS[TMIndex] := ApplyNaiveBayes(trainingSetIndexes, MainUnit.DATAMATRIX[foldsMatrix[ignorefold, i]], i);
           ClassStringGrid.Cells[0, TMIndex + 1] := IntToStr(TMCLASSRESULTS[TMIndex]);
+          TMREALCLASS[TMIndex] := MainUnit.CLASSARRAY[foldsMatrix[ignorefold, i]];
+          //Si la clasificacion fue correcta se suma a el numero de aciertos del fold
+          if (TMCLASSRESULTS[TMIndex] = TMREALCLASS[TMIndex]) then
+            foldSucceses[ignorefold] += 1;
           TMIndex += 1;
         end;
       end;
 
+      KFoldStatsStringGrid.RowCount := foldNum + 1;
+      KFoldStatsStringGrid.Cells[0, 0] := 'Fold #';
+      KFoldStatsStringGrid.Cells[1, 0] := 'Accuracy';
+      KFoldStatsStringGrid.Cells[2, 0] := 'Error';
+      ECORRECT := 0;
+      for f := 0 to foldNum - 1 do
+      begin
+        accuracy := (foldSucceses[f] / Length(foldsMatrix[f])) * 100;
+        error := (Length(foldsMatrix[f]) - foldSucceses[f]) / Length(foldsMatrix[f]);
+        accuracy := Round(accuracy * 100) / 100;
+        error := Round(error * 100) / 100;
+        ECORRECT += foldSucceses[f];
+        KFoldStatsStringGrid.Cells[0,f+1] := inttostr(f+1);
+        KFoldStatsStringGrid.Cells[1,f+1] := floattostr(accuracy);
+        KFoldStatsStringGrid.Cells[2,f+1] := floattostr(error);
+      end;
 
-
-
-
-
-      foldCorrect := 1;
-      foldTotal := 1;
-      ECORRECT := foldCorrect;
-      ETOTAL := foldTotal;
-      PerformanceAnalysis();
+      ETOTAL := TMROWSIZE;
+      TMCURRENTSTATUS := 'CLASSIFIED';
       UpdatePerformanceVisual();
     end
     else
@@ -436,11 +455,6 @@ var
   i, j: integer;
   DMIndexes: Array of Integer;
 begin
-  if not (TMCURRENTSTATUS = 'EVALUATING') then
-  begin
-    IGNORESTART := -1;
-    IGNOREEND := -1;
-  end;
   case ClassifierTypeCB.Text of
     'Naive Bayes':
     begin
@@ -545,19 +559,19 @@ begin
           ColCProb[j] := 1e-308;
     end;
     //Se agrega valor neutro de multiplicacion
-    TMCLASSPERCENT[i, currentC] := 1;
+    TMCLASSPERCENT[testRowIndex, currentC] := 1;
     //Se obtiene la probabilidad conjunta de todas las probabilidades de atributo
     for j := 0 to TMCOLSIZE - 1 do
     begin
-      TMCLASSPERCENT[i, currentC] := TMCLASSPERCENT[i, currentC] * ColCProb[j];
+      TMCLASSPERCENT[testRowIndex, currentC] := TMCLASSPERCENT[testRowIndex, currentC] * ColCProb[j];
       //Si el valor es demasiado pequeño se regresa a el limite de 1e-200 para que el programa no lo convierta en 0
-      if (TMCLASSPERCENT[i, currentC] < 1e-308) then
-          TMCLASSPERCENT[i, currentC] := 1e-308;
+      if (TMCLASSPERCENT[testRowIndex, currentC] < 1e-308) then
+          TMCLASSPERCENT[testRowIndex, currentC] := 1e-308;
     end;
     //Se multiplica por la probabilidad de clase
-    TMCLASSPERCENT[i, currentC] := TMCLASSPERCENT[i, currentC] * currentCProbInDM;
+    TMCLASSPERCENT[testRowIndex, currentC] := TMCLASSPERCENT[testRowIndex, currentC] * currentCProbInDM;
   end;
-  result := SelectMaxProbClass(TMCLASSPERCENT[i]);
+  result := SelectMaxProbClass(TMCLASSPERCENT[testRowIndex]);
 end;
 
 

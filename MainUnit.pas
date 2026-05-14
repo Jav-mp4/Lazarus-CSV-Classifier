@@ -1612,8 +1612,9 @@ begin
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
   //LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
-  ///Cargar elementos para prueba de TesterUnit//
-  //TesterForm.ShowModal;
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
+  //Cargar elementos para prueba de TesterUnit//
+  TesterForm.ShowModal;
   //Cargar elementos para prueba de Interactive Chart//
   {LoadInteractiveChart();}
 end;
