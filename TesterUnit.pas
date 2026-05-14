@@ -81,6 +81,7 @@ var
   TMCLASSRESULTS, TMREALCLASS: array of integer;
   TMSELECTEDROW, TMROWSIZE, TMCOLSIZE, IGNORESTART, IGNOREEND, ECORRECT, ETOTAL: integer;
   TSHASCLASS: Boolean;
+  //TMCURRENTSTATUS = [NONE, EVALUATING, NOT_CLASSIFIED, CLASSIFIED]
   TMCURRENTSTATUS: String;
 
 implementation
@@ -201,14 +202,17 @@ end;
 procedure TTesterForm.ApplyKFold();
 var
   //C = Class
-  i, j, f, c, k, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex: integer;
+  i, j, f, c, k, foldNum, foldRowCount, remaider, foldCorrect, foldTotal, totalC, rowIndex, ignorefold, TMIndex: integer;
   //foldsMatrix = indices que forman parte de cada fold, classSortedMatrix = indices pertenecientes a cada clase
   foldsMatrix, classSortedMatrix: array of array of integer;
-  maxRowsPerClass, classRowsUsed: array of integer;
+  maxRowsPerClass, classRowsUsed, trainingSetIndexes: array of integer;
   classPercentage: TDoubleArray;
   foundIndex: Boolean;
 begin
   try
+    TMROWSIZE := MainUnit.DMROWSIZE;
+    TMCOLSIZE := MainUnit.DMCOLSIZE;
+    InitialValues();
     //------------------------Se obtiene una matrix en la que cada i contiene los indices de cada fold---------------------//
     //Se obtiene el numero de folds
     foldNum := StrToInt(FoldsNumberEdit.Text);
@@ -309,8 +313,10 @@ begin
       end;
 
 
+       
 
-      {TestDataStringGrid.RowCount := 1;
+      //Muestra indices de cada fold
+      TestDataStringGrid.RowCount := 1;
       TestDataStringGrid.ColCount := foldNum;
       for f := 0 to foldNum - 1 do
       begin
@@ -318,25 +324,61 @@ begin
           TestDataStringGrid.RowCount := Length(foldsMatrix[f]) + 1;
         for i := 0 to Length(foldsMatrix[f]) - 1 do
           TestDataStringGrid.Cells[f, i + 1] := IntToStr(foldsMatrix[f, i]);;
-      end;}
+      end;
 
-      SetLength(TESTMATRIX, MainUnit.DMROWSIZE, MainUnit.DMCOLSIZE);
-      showmessage(inttostr(MainUnit.DMROWSIZE)+' '+inttostr(MainUnit.DMCOLSIZE));
-      i := 0;
-      for f := 0 to foldNum - 1 do
-        for j := 0 to Length(foldsMatrix[f]) - 1 do
+
+      //Se agregan todos los elementos en el orden en que fueron evaluados para mostrarse en TestDataStringGrid
+        SetLength(TESTMATRIX, MainUnit.DMROWSIZE, MainUnit.DMCOLSIZE);
+        i := 0;
+        for f := 0 to foldNum - 1 do
+          for j := 0 to Length(foldsMatrix[f]) - 1 do
+          begin
+            TESTMATRIX[i] := MainUnit.DATAMATRIX[foldsMatrix[f, j]];
+            i += 1;
+          end;
+        UpdateStringGrids();
+
+      //Recorre todos los fold apartando el actual y usando el resto como conjunto de entrenamiento
+      TMIndex := 0;
+      for ignorefold := 0 to foldNum - 1 do
+      begin
+        //Se agregan los indices que serviran como conjunto de entrenamiento para ingorefold
+        SetLength(trainingSetIndexes, 0);
+        //Contiene el indice actual de trainingSetIndexes
+        i := 0;
+        for f := 0 to foldNum - 1 do
         begin
-          showmessage(inttostr(foldsMatrix[f, j]));
-          TESTMATRIX[i] := MainUnit.DATAMATRIX[foldsMatrix[f, j]];
-          i += 1;
+          //Se agregan a trainingSetIndexes solo los folds distintos a ignorefold
+          if not (f = ignorefold) then
+          begin
+            //Se incrementa de acuerdo al numero de elementos en el fold actual
+            SetLength(trainingSetIndexes, Length(trainingSetIndexes) + Length(foldsMatrix[f]));
+            for j := 0 to Length(foldsMatrix[f]) - 1 do
+            begin
+              trainingSetIndexes[i] := foldsMatrix[f, j];
+              i += 1;
+            end;
+          end;
         end;
-      UpdateStringGrids();
+        //Se evaluan los indices en ignorefold usando como conjunto de entrenamiento a trainingSetIndexes
+        for i := 0 to Length(foldsMatrix[ignorefold]) - 1 do
+        begin
+          TMCLASSRESULTS[TMIndex] := ApplyNaiveBayes(trainingSetIndexes, MainUnit.DATAMATRIX[foldsMatrix[ignorefold, i]], i);
+          ClassStringGrid.Cells[0, TMIndex + 1] := IntToStr(TMCLASSRESULTS[TMIndex]);
+          TMIndex += 1;
+        end;
+      end;
+
+
+
+
 
 
       foldCorrect := 1;
       foldTotal := 1;
       ECORRECT := foldCorrect;
       ETOTAL := foldTotal;
+      PerformanceAnalysis();
       UpdatePerformanceVisual();
     end
     else
@@ -694,7 +736,7 @@ end;
 
 procedure TTesterForm.FormActivate(Sender: TObject);
 begin
-   LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+   //LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
 end;
 
 procedure TTesterForm.EvaluateBtnClick(Sender: TObject);

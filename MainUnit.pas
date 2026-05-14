@@ -233,7 +233,7 @@ begin
         if (row + 1 > mtxRowLength) then
         begin
           mtxRowLength += 100;
-          SetLength(doubleMatrix, mtxRowLength);
+          SetLength(doubleMatrix, mtxRowLength, mtxColLength);
         end;
         col := 0;
         for c := 1 to Length(txt_line) do
@@ -1611,9 +1611,9 @@ begin
   XCOLINDEX := 0;
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  //LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
   ///Cargar elementos para prueba de TesterUnit//
-  TesterForm.ShowModal;
+  //TesterForm.ShowModal;
   //Cargar elementos para prueba de Interactive Chart//
   {LoadInteractiveChart();}
 end;
