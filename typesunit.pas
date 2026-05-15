@@ -9,6 +9,7 @@ uses
 type
   TDoubleArray = array of double;
   TDoubleMatrix = array of TDoubleArray;
+  TIntegerArray = array of Integer;
 
 
 

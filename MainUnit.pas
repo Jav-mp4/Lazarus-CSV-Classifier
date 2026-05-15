@@ -27,6 +27,7 @@ type
     InterChartCanvasImg: TImage;
     InterChartMenuItem: TMenuItem;
     SaveDataMenuItem: TMenuItem;
+    StringGrid1: TStringGrid;
     TesterBtn: TButton;
     ClearDataBtn: TButton;
     CurrentRowEdit: TEdit;
@@ -86,7 +87,11 @@ type
     procedure EraseInterPoint(xCol, yCol: double);
     procedure EnableInterFormElements();
 
-    //Funciones 
+    //Funciones
+    procedure ApplyDIANA(TrainingSetIndexes: TDoubleMatrix);
+    function GetDistanceFromDMatrix(distanceMatrix: TDoubleMatrix;i, j: integer): double;
+    function DeleteRowFromIntArray(IntArray: TIntegerArray; indexToDelete: Integer):TIntegerArray;
+    function GetGowerDistance(x: TDoubleArray; y: TDoubleArray; ranges: TDoubleArray):Double;
     procedure UpdateDataChart();
     procedure SynchNormalizeTypeValues();
     function GetMean(doubleArray: TDoubleArray): double;
@@ -150,7 +155,7 @@ var
   DATATAG, CLASSARRAY: array of integer;
   DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW,SELECTEDCOL, IXRange, IYRange: integer;
   CURRENTGRAPH: string; // CURRENTGRAPH ['NONE', 'SCATTERPLOT', 'BARCHART', 'BOXPLOT', 'INTERACTIVE']
-
+  DMISSUPERVISED: boolean;
   CLASSCOLORS: array of TColor;
 
 implementation
@@ -282,6 +287,248 @@ begin
   finally
     CloseFile(full_file);
   end;
+end;
+
+
+//------------------------Cargar Archivo Principal -----------------------------//
+procedure TMainForm.LoadMainData(doubleMatrix: TDoubleMatrix);
+var
+  i, j: integer;
+begin
+  try
+    DMROWSIZE := Length(doubleMatrix) - 1;
+    //Si es supervisado no se cuenta la ultima columna, si no lo es si se cuenta
+    if (DMISSUPERVISED) then
+      DMCOLSIZE := Length(doubleMatrix[0]) - 1
+    else
+      DMCOLSIZE := Length(doubleMatrix[0]);
+    SetLength(DATATAG, DMCOLSIZE + 1);
+    SetLength(DATAMATRIX, DMROWSIZE, DMCOLSIZE);
+    SetLength(CLASSARRAY, DMROWSIZE);
+    DataStringGrid.Clean;
+    DataStringGrid.ColCount := DMCOLSIZE + 1;
+    DataStringGrid.rowCount := DMROWSIZE + 1;
+
+    //Se obtienen los datos de las etiquetas
+    for j := 0 to DMCOLSIZE do
+    begin
+      DATATAG[j] := Round(doubleMatrix[0, j]);
+      DataStringGrid.Cells[j, 0] := FloatToStr(doubleMatrix[0, j]);
+    end;
+
+    //Se obtienen los datos de cada fila
+    for i := 0 to DMROWSIZE - 1 do
+    begin
+      for j := 0 to DMCOLSIZE - 1 do
+      begin
+    //Se usa doubleMatrix[i+1] para ignorar primer fila
+        DATAMATRIX[i, j] := doubleMatrix[i + 1, j];
+        DataStringGrid.Cells[j, i + 1] := FloatToStr(doubleMatrix[i + 1, j]);
+      end;
+    end;
+
+    if (DMISSUPERVISED) then
+      //Se obtienen los valores de clase de la ultima columna de doublematrix
+      for i := 0 to DMROWSIZE - 1 do
+      begin
+        CLASSARRAY[i] := Round(doubleMatrix[i + 1, DMCOLSIZE]);
+        DataStringGrid.Cells[DMCOLSIZE, i + 1] := FloatToStr(doubleMatrix[i + 1, DMCOLSIZE]);
+      end
+    else
+    begin
+      //Se aplica DIANA para generar clases
+      ApplyDIANA(DATAMATRIX);
+    end;
+
+    //DATATAG
+
+    SetLength(STATSMATRIX, 3, DMCOLSIZE);
+    SetLength(SORTEDMATRIX, DMROWSIZE, DMCOLSIZE);
+
+    StatisticsStringGrid.Clean;
+    ColNumberStringGrid.Clean;
+    RowNumberStringGrid.Clean;
+    StatisticsStringGrid.RowCount := 3;
+    StatisticsStringGrid.ColCount := DMCOLSIZE + 1;
+    ColNumberStringGrid.RowCount := 1;
+    ColNumberStringGrid.ColCount := DMCOLSIZE + 1;
+    RowNumberStringGrid.ColCount := 1;
+    RowNumberStringGrid.RowCount := DMROWSIZE;
+
+    ColNumberStringGrid.LeftCol := 0;
+    RowNumberStringGrid.LeftCol := 0;
+    DataStringGrid.LeftCol := 0;
+    StatisticsStringGrid.LeftCol := 0;
+
+    //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
+    for j := 0 to DMCOLSIZE - 1 do
+      ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
+    ColNumberStringGrid.Cells[DMCOLSIZE, 0] := 'Class';
+    for i := 0 to DMROWSIZE - 1 do
+      RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
+
+    //Agregar -1 a toda la primera fila de SORTEDMATRIX para indicar que no estan ordenadas
+    for j := 0 to DMCOLSIZE - 1 do
+      SORTEDMATRIX[0, j] := -1;
+
+    //Obtiene los valores Media,Mediana y Desviacion para cada columna
+    GetStats();
+    //Toma el valor de la primera fila para utilizar en el Chart
+    XCOLINDEX := 0;
+    YCOLINDEX := 0;
+    SELECTEDROW := 0;
+    XValueEdit.Text := IntToStr(XCOLINDEX + 1);
+    YValueEdit.Text := IntToStr(YCOLINDEX + 1);
+    DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
+
+    EnableStaticFormElements();
+    DataChartTypeCB.ItemIndex := 1;
+    SynchDataChartTypeValues();
+    UpdateDataChart();
+  except
+    On e: ERangeError do
+      //ShowMessage(e.Message);
+  end;
+end;
+
+
+procedure TMainForm.ApplyDIANA(TrainingSetIndexes: TDoubleMatrix);
+var
+  //Dis = Distance, Cl = Cluster
+  i, j, chosenCluster, MaxDisimilIndex, currentClIndexNum: integer;
+  oldClAvrgDis, newClAvrgDis: double;
+  cicleHadChanges: boolean;
+  colRangeValues, minMax, avrgDisimilarity: TDoubleArray;
+  distanceMatrix: TDoubleMatrix;
+  //clusters contiene los indices correspondientes en DATAMATRIX de todos los elementos entre de cada cluster
+  clusters: array of TIntegerArray;
+begin
+  //Se obtien los valores minimo y maximo de los atributos numericos para utilizar como rango en Gower
+  SetLength(minMax, 2);
+  SetLength(colRangeValues, DMCOLSIZE);
+  for j := 0 to MainUnit.DMCOLSIZE - 1 do
+  begin
+    if (DATATAG[j] = 0) then
+    begin
+      minMax := MainForm.GetColMinMaxValues(j);
+      colRangeValues[j] := minMax[1] - minMax[0];
+    end;
+  end;
+
+  //El primer cluster contendra a todos los elementos
+  SetLength(clusters, 1, DMROWSIZE);
+  for i := 0 to DMROWSIZE - 1 do
+    clusters[0, i] := i;
+  chosenCluster := 0;
+
+  StringGrid1.ColCount := Length(clusters[chosenCluster]);
+  StringGrid1.RowCount := Length(clusters[chosenCluster]);
+  //Se guardan las distancias entre todos los elementos pero sin repetir los ya calculados e ignorando el calculo de la distancia con sigo mismo
+  SetLength(distanceMatrix, Length(clusters[chosenCluster]));
+  for i := 0 to DMROWSIZE - 1 do
+  begin
+    //Se resta 1 por que los indices inician en 0, para que desde el primer indice se quite la comparacion [0,0]
+    SetLength(distanceMatrix[i], Length(clusters[chosenCluster]) - i - 1);
+    for j := 0 to Length(distanceMatrix[i]) - 1 do
+    begin
+      distanceMatrix[i, j] := GetGowerDistance(DATAMATRIX[clusters[chosenCluster, i]], DATAMATRIX[clusters[chosenCluster, j + i + 1]], colRangeValues);
+      StringGrid1.Cells[i, j + i + 1] := floattostr(distanceMatrix[i, j]);
+      StringGrid1.Cells[j + i + 1, i] := floattostr(distanceMatrix[i, j]);
+    end;
+  end;
+
+  //Se busca el elemento con la disimilitud promedio mas grande para ser el primer elemento del nuevo cluster
+
+  //Se obtiene disimilitud promedio de cada elemento del cluster
+  SetLength(avrgDisimilarity, DMROWSIZE);
+  //Elemento siendo evaluado actualmente
+  for i := 0 to Length(clusters[chosenCluster]) - 1 do
+  begin
+    avrgDisimilarity[i] := 0;
+    //Todos los demas elementos
+    for j := 0 to Length(clusters[chosenCluster]) - 1 do
+    begin
+      //Se encuentra el promedio de todas las distancias del elemento actual con respecto a los demas
+      if not (i = j) then
+      begin
+        avrgDisimilarity[i] += GetDistanceFromDMatrix(distanceMatrix, i, j);
+      end;
+    end;
+    avrgDisimilarity[i] := avrgDisimilarity[i] / Length(clusters[chosenCluster])-1;
+  end;
+  //Se encuentra el indice con la disimilitud mas grande
+  MaxDisimilIndex := 0;
+  for i := 0 to Length(clusters[chosenCluster])-1 do
+    if (avrgDisimilarity[i] > avrgDisimilarity[MaxDisimilIndex]) then
+      MaxDisimilIndex := i;
+
+  currentClIndexNum := Length(clusters[chosenCluster]);
+  //Se añade un nuevo cluster y como primer elemento se transfiere al elemento con mayor disimilitud encontrado
+  SetLength(clusters, Length(clusters)+1);
+  SetLength(clusters[Length(clusters)-1], 1);
+  clusters[Length(clusters)-1, 0] := MaxDisimilIndex;
+  //Se recalculan distancias promedio entre clusters hasta que todos esten agrupados en su cluster mas cercano
+  {repeat
+    cicleHadChanges := False;
+    for i := 0 to currentClIndexNum-1 do
+    begin
+      oldClAvrgDis := 0;
+      for j:= 0 to Length(clusters[chosenCluster])-1 do
+        oldClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, i, j);
+      oldClAvrgDis := oldClAvrgDis / Length(clusters[chosenCluster])-1
+    end;
+  until not(cicleHadChanges);
+  clusters[chosenCluster] := DeleteRowFromIntArray(clusters[chosenCluster], MaxDisimilIndex);}
+
+
+
+
+
+
+
+end;
+
+function TMainForm.GetDistanceFromDMatrix(distanceMatrix: TDoubleMatrix; i, j: integer): double;
+begin
+  //Para no repetir las distancias como [a,b] y [b,a] distanceMatrix tiene como indice i el elemento siendo evaluado
+  //y como indice j todos con los cuales se comparó la distancia, en cada i se le resta la comparacion con sigo mismo
+  //Y como algunas comparaciones ya fueron echas en indices anteriores cada i reduce en tamaño con respecto a tamaño de elementos -i
+  if (i > j) then
+    Result := distanceMatrix[j, i - j - 1]
+  else
+    Result := distanceMatrix[i, j - i - 1];
+end;
+function TMainForm.DeleteRowFromIntArray(IntArray: TIntegerArray; indexToDelete: Integer): TIntegerArray;
+var
+  i: Integer;
+begin
+  for i := indexToDelete to Length(IntArray)-2 do
+     IntArray[i] := IntArray[i+1];
+  SetLength(IntArray, Length(IntArray)-1);
+  result := IntArray;
+end;
+
+
+function TMainForm.GetGowerDistance(x: TDoubleArray; y: TDoubleArray; ranges: TDoubleArray):Double;
+var
+  j, NominalDis: integer;
+  NumericalDis: double;
+begin
+  NumericalDis := 0;
+  NominalDis := 0;
+  //Se utiliza el metodo Gower par obtener distancias parciales
+  for j := 0 to MainUnit.DMCOLSIZE-1 do
+    begin
+      //Si el valor es numerico se aplica la operacion correspondiente en Gower
+      if (MainUnit.DATATAG[j] = 0) then
+        NumericalDis += Abs(x[j] - y[j]) / ranges[j]
+      //Si el valor es nominal se aplica distancia igual que Hamming
+      else
+        if not(x[j] = y[j]) then
+          NominalDis += 1;
+    end;
+  //Se obtiene la distancia total sumando los valores obtenidos y sacando el promedio
+  result := (NumericalDis + NominalDis) / MainUnit.DMCOLSIZE;
 end;
 
 // DC = DataChart
@@ -596,92 +843,6 @@ end;
 
 
 
-//------------------------Cargar Archivo Principal -----------------------------//
-procedure TMainForm.LoadMainData(doubleMatrix: TDoubleMatrix);
-var
-  i, j: integer;
-begin
-  try
-  DMROWSIZE := Length(doubleMatrix) - 1;
-  DMCOLSIZE := Length(doubleMatrix[0]) - 1;
-  SetLength(DATATAG, DMCOLSIZE + 1);
-  SetLength(DATAMATRIX, DMROWSIZE, DMCOLSIZE);
-  SetLength(CLASSARRAY, DMROWSIZE);
-  DataStringGrid.Clean;
-  DataStringGrid.ColCount := DMCOLSIZE + 1;
-  DataStringGrid.rowCount := DMROWSIZE + 1;
-  //Se obtienen los datos de las etiquetas
-  for j := 0 to DMCOLSIZE do
-  begin
-    DATATAG[j] := Round(doubleMatrix[0, j]);
-    DataStringGrid.Cells[j, 0] := FloatToStr(doubleMatrix[0, j]);
-  end;
-  //Se obtienen los datos de cada ejemplo
-  //Se empieza por i := 1 para ignorar primer fila
-  for i := 0 to DMROWSIZE - 1 do
-  begin
-    for j := 0 to DMCOLSIZE - 1 do
-    begin
-      DATAMATRIX[i, j] := doubleMatrix[i + 1, j];
-      DataStringGrid.Cells[j, i + 1] := FloatToStr(doubleMatrix[i + 1, j]);
-    end;
-  end;
-  //Se obtienen los valores de clase de la ultima columna en cada fila DMCOLSIZE es equivalente a ultimo indice de doublematrix
-  for i := 0 to DMROWSIZE - 1 do
-  begin
-    CLASSARRAY[i] := Round(doubleMatrix[i + 1, DMCOLSIZE]);
-    DataStringGrid.Cells[DMCOLSIZE, i + 1] := FloatToStr(doubleMatrix[i + 1, DMCOLSIZE]);
-  end;
-
-
-  SetLength(STATSMATRIX, 3, DMCOLSIZE);
-  SetLength(SORTEDMATRIX, DMROWSIZE, DMCOLSIZE);
-
-  StatisticsStringGrid.Clean;
-  ColNumberStringGrid.Clean;
-  RowNumberStringGrid.Clean;
-  StatisticsStringGrid.RowCount := 3;
-  StatisticsStringGrid.ColCount := DMCOLSIZE + 1;
-  ColNumberStringGrid.RowCount := 1;
-  ColNumberStringGrid.ColCount := DMCOLSIZE + 1;
-  RowNumberStringGrid.ColCount := 1;
-  RowNumberStringGrid.RowCount := DMROWSIZE;
-
-  ColNumberStringGrid.LeftCol := 0;
-  RowNumberStringGrid.LeftCol := 0;
-  DataStringGrid.LeftCol := 0;
-  StatisticsStringGrid.LeftCol := 0;
-
-  //Se llena el StringGrid que contiene el indice de las columnas y el de las filas
-  for j := 0 to DMCOLSIZE - 1 do
-    ColNumberStringGrid.Cells[j, 0] := IntToStr(j + 1);
-  ColNumberStringGrid.Cells[DMCOLSIZE, 0] := 'Class';
-  for i := 0 to DMROWSIZE - 1 do
-    RowNumberStringGrid.Cells[0, i] := IntToStr(i + 1);
-
-  //Agregar -1 a toda la primera fila de SORTEDMATRIX para indicar que no estan ordenadas
-  for j := 0 to DMCOLSIZE - 1 do
-    SORTEDMATRIX[0, j] := -1;
-
-  //Obtiene los valores Media,Mediana y Desviacion para cada columna
-  GetStats();
-  //Toma el valor de la primera fila para utilizar en el Chart
-  XCOLINDEX := 0;
-  YCOLINDEX := 0;
-  SELECTEDROW := 0;
-  XValueEdit.Text := IntToStr(XCOLINDEX + 1);
-  YValueEdit.Text := IntToStr(YCOLINDEX + 1);
-  DMSize.Caption := 'Columns ' + IntToStr(DMCOLSIZE) + '     Rows ' + IntToStr(DMROWSIZE);
-
-  EnableStaticFormElements();
-  DataChartTypeCB.ItemIndex := 1;
-  SynchDataChartTypeValues();
-  UpdateDataChart();
-  except
-        On e: ERangeError do
-        //ShowMessage(e.Message);
-  end;
-end;
 
 procedure TMainForm.GetStats();
 var
@@ -1611,12 +1772,15 @@ begin
   XCOLINDEX := 0;
   YCOLINDEX := 1;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  //LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
+  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));}
+  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));}
   //Cargar elementos para prueba de TesterUnit//
-  TesterForm.ShowModal;
+  {TesterForm.ShowModal;}
   //Cargar elementos para prueba de Interactive Chart//
   {LoadInteractiveChart();}
+  //Cargar elementos para prueba de datos no supervisados//
+  DMISSUPERVISED := False;
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_Unsupervised_Short.txt'));
 end;
 
 procedure TMainForm.InterChartCanvasImgMouseDown(Sender: TObject;
@@ -1642,12 +1806,21 @@ end;
 procedure TMainForm.LoadCSVMenuItemClick(Sender: TObject);
 var
   doubleMatrix: TDoubleMatrix;
+  answer: Integer;
 begin
   try
     OpenDialog1.Execute;
     doubleMatrix := LoadCSVFileToMatrix(OpenDialog1.FileName);
-    if(length(doubleMatrix) = 0) then
-    raise ERangeError.Create('');
+    if (length(doubleMatrix) = 0) then
+      raise ERangeError.Create('');
+
+    //El usuario define si es supervisado o no
+    answer := MessageDlg(' ', 'Supervised Data', mtConfirmation, [mbYes, mbNo], 0);
+    if (answer = mrYes) then
+      DMISSUPERVISED := True
+    else
+      DMISSUPERVISED := False;
+
     LoadMainData(doubleMatrix);
     DisableFormElements();
     EnableStaticFormElements();

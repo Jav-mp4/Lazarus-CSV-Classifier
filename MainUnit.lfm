@@ -1,10 +1,10 @@
 object MainForm: TMainForm
   Left = 429
-  Height = 593
+  Height = 811
   Top = 250
   Width = 1347
   Caption = 'Maximus Classifiersicus'
-  ClientHeight = 593
+  ClientHeight = 811
   ClientWidth = 1347
   DesignTimePPI = 106
   Menu = MainMenu1
@@ -393,6 +393,15 @@ object MainForm: TMainForm
     Top = 20
     Width = 63
     Caption = 'Min    Max'
+  end
+  object StringGrid1: TStringGrid
+    Left = 304
+    Height = 216
+    Top = 584
+    Width = 529
+    FixedCols = 0
+    FixedRows = 0
+    TabOrder = 27
   end
   object OpenDialog1: TOpenDialog
     Filter = 'Data Filter|*.csv;*.txt'

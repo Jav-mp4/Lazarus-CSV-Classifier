@@ -201,6 +201,10 @@ begin
   end;
 end;
 
+
+
+
+
 procedure TTesterForm.ApplyKFold();
 var
   //C = Class
@@ -453,16 +457,16 @@ end;
 procedure TTesterForm.ClassifyTestSet();
 var
   i, j: integer;
-  DMIndexes: Array of Integer;
+  DMIndexes: array of integer;
 begin
+  //Se agregan los indices de todos los elementos en DATAMATRIX
+  SetLength(DMIndexes, MainUnit.DMROWSIZE);
+  for j := 0 to MainUnit.DMROWSIZE - 1 do
+    DMIndexes[j] := j;
   case ClassifierTypeCB.Text of
     'Naive Bayes':
     begin
       SetLength(TMCLASSPERCENT, TMROWSIZE, MainUnit.DATATAG[Length(MainUnit.DATATAG) - 1]);
-      //Se agregan los indices de todos los elementos en DATAMATRIX
-      SetLength(DMIndexes, MainUnit.DMROWSIZE);
-      for j := 0 to MainUnit.DMROWSIZE - 1 do
-        DMIndexes[j] := j;
       //Recorre todas las filas en TESTMATRIX para aplicarles Naive Bayes
       for i := 0 to Length(TESTMATRIX) - 1 do
       begin
@@ -751,6 +755,7 @@ end;
 procedure TTesterForm.FormActivate(Sender: TObject);
 begin
    //LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  //LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet_OneRow.txt'));
 end;
 
 procedure TTesterForm.EvaluateBtnClick(Sender: TObject);
