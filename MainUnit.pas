@@ -96,11 +96,12 @@ type
     function GetMean(doubleArray: TDoubleArray): double;
     function GetMedian(sortedDoubleArray: TDoubleArray): double;
     function GetStandarDev(doubleArray: TDoubleArray; mean: double): double;
-    function GetColMinMaxValues(colIndex: integer): TDoubleArray;
+    function GetColMinMaxValues(doubleMatrix:TDoubleMatrix; colIndex: integer): TDoubleArray;
+    function GetDoubleMatrixCol(doubleMatrix: TDoubleMatrix; colIndex: integer): TDoubleArray;
     procedure NormalizeCol();
-    procedure MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
-    procedure ZScoreDMCol(colIndex: integer);
-    procedure DecimalScalingDMCol(colIndex: integer);
+    procedure MinMaxDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+    procedure ZScoreDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer);
+    procedure DecimalScalingDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer);
     procedure GetStats();
     procedure UpdateDataStringGridValues();
     procedure DisableFormElements();
@@ -148,8 +149,9 @@ type
 
 var
   MainForm: TMainForm;
-  //DATASTATSMATRIX Significado de indices:  0=Media, 1=Mediana, 2=Desviacion estandar
-  DATAMATRIX, STATSMATRIX: TDoubleMatrix;
+  //DATASTATSMATRIX indices:  0=Media, 1=Mediana, 2=Desviacion estandar
+  //LASTNORMALIZATION indices: [0] = Tipo de normalizacion(0 = ninguna, 1 = minmax, 2 = z-score, 3 = decimalscaling), [1] = min (para minmax), [2] = max (para minmax)
+  DATAMATRIX, STATSMATRIX, LASTNORMALIZATION: TDoubleMatrix;
   SORTEDMATRIX: array of array of integer;
   DATATAG, CLASSARRAY: array of integer;
   DMROWSIZE, DMCOLSIZE, XCOLINDEX, YCOLINDEX, SELECTEDROW,SELECTEDCOL, IXRange, IYRange: integer;
@@ -302,8 +304,12 @@ begin
     else
       DMCOLSIZE := Length(doubleMatrix[0]);
     SetLength(DATATAG, DMCOLSIZE + 1);
+    SetLength(LASTNORMALIZATION, DMCOLSIZE, 3);
+    for j := 0 to DMCOLSIZE - 1 do
+      LASTNORMALIZATION[j,0] := 0;
     SetLength(DATAMATRIX, DMROWSIZE, DMCOLSIZE);
     SetLength(CLASSARRAY, DMROWSIZE);
+
     DataStringGrid.Clean;
     DataStringGrid.ColCount := DMCOLSIZE + 1;
     DataStringGrid.rowCount := DMROWSIZE + 1;
@@ -411,7 +417,7 @@ begin
   begin
     if (DATATAG[j] = 0) then
     begin
-      minMax := MainForm.GetColMinMaxValues(j);
+      minMax := MainForm.GetColMinMaxValues(DATAMATRIX, j);
       colRangeValues[j] := minMax[1] - minMax[0];
     end;
   end;
@@ -747,8 +753,11 @@ var j: Integer;
 begin
   //Se limpian valores en el arreglo de datos y el de colores de clase
   SetLength(DATATAG,3);
+  SetLength(LASTNORMALIZATION, 2, 3);
   SetLength(CLASSCOLORS,0);
   SetLength(STATSMATRIX,3,2);
+  LASTNORMALIZATION[0, 0] := 0;
+  LASTNORMALIZATION[1, 0] := 0;
   DATATAG[0] := 0;
   DATATAG[1] := 0;
   DATATAG[2] := 0;
@@ -1199,6 +1208,7 @@ begin
   XCOLINDEX := -1;
   YCOLINDEX := -1;
   SELECTEDROW := -1;
+  SetLength(LASTNORMALIZATION, 0);
   InterClassCB.Items.Clear;
 
   //Desactivar botones
@@ -1274,6 +1284,19 @@ begin
   Result := sortedArray;
 end;
 
+//Obtener columna de un TDoubleMatrix en un TDoubleArray
+function TMainForm.GetDoubleMatrixCol(doubleMatrix: TDoubleMatrix; colIndex: integer): TDoubleArray;
+var
+  colArray: TDoubleArray;
+  i: integer;
+begin
+  SetLength(colArray, Length(doubleMatrix));
+  for i := 0 to Length(doubleMatrix)-1 do
+  begin
+    colArray[i] := doubleMatrix[i, colIndex];
+  end;
+  Result := colArray;
+end;
 
 
 //Valor real del indice en SORTEDMATRIX
@@ -1513,7 +1536,7 @@ begin
     if (IsInsideRange(StrToInt(CurrentColEdit.Text), DMCOLSIZE)) then
     begin
       colIndex := StrToInt(CurrentColEdit.Text) - 1;
-      if (DATATAG[colIndex - 1] = 0) then
+      if (DATATAG[colIndex] = 0) then
       begin
         case NormalizeTypeCB.Text of
           'Min-Max':
@@ -1522,22 +1545,28 @@ begin
             newMax := StrToFloat(NewMaxEdit.Text);
             if (newMin < newMax) then
             begin
-              minMaxValues := GetColMinMaxValues(colIndex);
-              MinMaxDMCol(colIndex, minMaxValues[0], minMaxValues[1], newMin, newMax);
+              minMaxValues := GetColMinMaxValues(DATAMATRIX, colIndex);
+              MinMaxDMCol(DATAMATRIX, colIndex, minMaxValues[0], minMaxValues[1], newMin, newMax);
+              LASTNORMALIZATION[colIndex, 0] := 1;
+              LASTNORMALIZATION[colIndex, 1] := newMin;
+              LASTNORMALIZATION[colIndex, 2] := newMax;
             end
             else
               raise  ERangeError.Create('invalid range');
           end;
           'Z-Score':
           begin
-            ZScoreDMCol(colIndex);
+            ZScoreDMCol(DATAMATRIX, colIndex);
+            LASTNORMALIZATION[colIndex, 0] := 2;
           end;
           'Decimal Scaling':
           begin
-            DecimalScalingDMCol(colIndex);
+            DecimalScalingDMCol(DATAMATRIX, colIndex);
+            LASTNORMALIZATION[colIndex, 0] := 3;
           end;
         end;
         UpdateDataStringGridValues();
+        TesterForm.UpdateTMNormalization();
       end
       else
         raise  EConvertError.Create('invalid column type');
@@ -1554,23 +1583,23 @@ end;
 
 
 //Se obtiene el valor minimo y el maximo de la columna  TDoubleArray[0] = minimo,  TDoubleArray[1] = maximo
-function TMainForm.GetColMinMaxValues(colIndex: integer): TDoubleArray;
+function TMainForm.GetColMinMaxValues(doubleMatrix: TDoubleMatrix; colIndex: integer): TDoubleArray;
 var
   i: integer;
   //minMaxValues[0] = minimo,  minMaxValues[1] = maximo
   minMaxValues: TDoubleArray;
 begin
   SetLength(minMaxValues, 2);
-  if not (Length(DATAMATRIX) = 0) then
+  if not (Length(doubleMatrix) = 0) then
   begin
-    minMaxValues[0] := DATAMATRIX[0, colIndex];
-    minMaxValues[1] := DATAMATRIX[0, colIndex];
-    for i := 0 to DMROWSIZE - 1 do
+    minMaxValues[0] := doubleMatrix[0, colIndex];
+    minMaxValues[1] := doubleMatrix[0, colIndex];
+    for i := 0 to Length(doubleMatrix) - 1 do
     begin
-      if (DATAMATRIX[i, colIndex] < minMaxValues[0]) then
-        minMaxValues[0] := DATAMATRIX[i, colIndex];
-      if (DATAMATRIX[i, colIndex] > minMaxValues[1]) then
-        minMaxValues[1] := DATAMATRIX[i, colIndex];
+      if (doubleMatrix[i, colIndex] < minMaxValues[0]) then
+        minMaxValues[0] := doubleMatrix[i, colIndex];
+      if (doubleMatrix[i, colIndex] > minMaxValues[1]) then
+        minMaxValues[1] := doubleMatrix[i, colIndex];
     end;
     Result := minMaxValues;
   end
@@ -1578,41 +1607,56 @@ begin
     raise ERangeError.Create('datamatrix is empty');
 end;
 
-procedure TMainForm.MinMaxDMCol(colIndex: integer; oldMin, oldMax, newMin, newMax: double);
+procedure TMainForm.MinMaxDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer; oldMin, oldMax, newMin, newMax: double);
 var
   i: integer;
 begin
   //Se realiza la normalizacion min-max en cada valor de la columna colIndex
-  for i := 0 to DMROWSIZE-1 do
-      DATAMATRIX[i, colIndex] := ( (DATAMATRIX[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
+  for i := 0 to Length(doubleMatrix)-1 do
+      doubleMatrix[i, colIndex] := ( (doubleMatrix[i, colIndex] - oldMin) / (oldMax - oldMin) * (newMax - newMin) ) + newMin;
 end;
 
-procedure TMainForm.ZScoreDMCol(colIndex: integer);
+procedure TMainForm.ZScoreDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer);
+var
+  i: integer;
+  colArray: TDoubleArray;
+  mean, standarDev: Double;
+begin
+  colArray := GetDoubleMatrixCol(doubleMatrix, colIndex);
+  mean := GetMean(colArray);
+  standarDev := GetStandarDev(colArray, mean);
+  //Se realiza la normalizacion z-score en cada valor de la columna colIndex
+  for i := 0 to Length(doubleMatrix)-1 do
+      doubleMatrix[i, colIndex] := (doubleMatrix[i, colIndex] - mean) / standarDev;
+end;
+
+{procedure TMainForm.ZScoreDMCol(colIndex: integer);
 var
   i: integer;
 begin
+
   //Se realiza la normalizacion z-score en cada valor de la columna colIndex
   for i := 0 to DMROWSIZE-1 do
       DATAMATRIX[i, colIndex] := (DATAMATRIX[i, colIndex] - STATSMATRIX[0,colIndex]) / STATSMATRIX[2,colIndex];
-end;
+end;}
 
-procedure TMainForm.DecimalScalingDMCol(colIndex: integer);
+procedure TMainForm.DecimalScalingDMCol(doubleMatrix:TDoubleMatrix; colIndex: integer);
 var
   i, digitNum: integer;
   maxAbsolute: double;
 begin
   //Se obtiene el valor absoluto maximo en la columna
-  maxAbsolute := DATAMATRIX[0, colIndex];
-  for i := 0 to DMROWSIZE - 1 do
+  maxAbsolute := doubleMatrix[0, colIndex];
+  for i := 0 to Length(doubleMatrix)-1 do
   begin
-    if Abs(DATAMATRIX[i, colIndex]) > maxAbsolute then
-      maxAbsolute := Abs(DATAMATRIX[i, colIndex]);
+    if Abs(doubleMatrix[i, colIndex]) > maxAbsolute then
+      maxAbsolute := Abs(doubleMatrix[i, colIndex]);
   end;
   //Obtiene numero de digitos
   digitNum := floor(Log10(maxAbsolute) + 1);
   //Formula Decimal Scaling
-  for i := 0 to DMROWSIZE - 1 do
-    DATAMATRIX[i, colIndex] := DATAMATRIX[i, colIndex] / Power(10, digitNum);
+  for i := 0 to Length(doubleMatrix)-1 do
+    doubleMatrix[i, colIndex] := doubleMatrix[i, colIndex] / Power(10, digitNum);
 end;
 
 procedure TMainForm.ShowChartElement(elementToShow: string);
@@ -1716,8 +1760,8 @@ begin
           IXRange := StrToInt(XValueEdit.Text);
           IYRange := StrToInt(YValueEdit.Text);
           GenerateInteractiveChartAxisLines();
-          MinMaxDMCol(0, 0, oldIXRange, 0, IXRange);
-          MinMaxDMCol(1, 0, oldIYRange, 0, IYRange);
+          MinMaxDMCol(DATAMATRIX, 0, 0, oldIXRange, 0, IXRange);
+          MinMaxDMCol(DATAMATRIX, 1, 0, oldIYRange, 0, IYRange);
           UpdateDataStringGridValues();
         end;
       end;
@@ -1873,17 +1917,20 @@ begin
   //Cargar elementos para prueba de Static Chart//
   XCOLINDEX := 0;
   YCOLINDEX := 1;
-  DMISSUPERVISED := False;
+  DMISSUPERVISED := True;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_short.txt'));
-  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));}
-  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_Unsupervised_Short.txt'));}
-  //Cargar elementos para prueba de TesterUnit//
-  {TesterForm.ShowModal;}
-  //Cargar elementos para prueba de Interactive Chart//
-  {LoadInteractiveChart();}
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  TesterForm.ShowModal;
+  {
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
   //Cargar elementos para prueba de datos no supervisados//
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_Unsupervised_Short.txt'));
+  //Cargar elementos para prueba de TesterUnit//
+  TesterForm.ShowModal;
+  //Cargar elementos para prueba de Interactive Chart//
+  LoadInteractiveChart();
+  }
 end;
 
 procedure TMainForm.InterChartCanvasImgMouseDown(Sender: TObject;

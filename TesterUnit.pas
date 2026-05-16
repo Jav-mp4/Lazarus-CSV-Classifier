@@ -54,6 +54,7 @@ type
     function ApplyNaiveBayes(TrainingSetIndexes: Array of Integer; testRow: TDoubleArray; testRowIndex: Integer): Integer;
     function SelectMaxProbClass(totalCProb: TDoubleArray): Integer;
     procedure ApplyKFold();
+    procedure UpdateTMNormalization();
 
 
     //Eventos
@@ -167,6 +168,7 @@ begin
       UpdateStringGrids();
       UpdateTestVisual();
       EvaluationButtonsEnabling();
+      UpdateTMNormalization();
     end
     else
       raise EConvertError.Create('');
@@ -738,6 +740,49 @@ begin
   if (TMCURRENTSTATUS = 'CLASSIFIED') or ((TMCURRENTSTATUS = 'EVALUATING')) then
      UpdateTestGraph();
 end;
+
+
+
+procedure TTesterForm.UpdateTMNormalization();
+var
+  i, j: integer;
+  newMin, newMax: double;
+  minMaxValues: TDoubleArray;
+begin
+  if (Length(TESTMATRIX) > 0) then
+  begin
+    //Recorre todas las columnas buscando si fue normalizado
+    for j := 0 to MainUnit.DMCOLSIZE - 1 do
+    begin
+      case Round(MainUnit.LASTNORMALIZATION[j, 0]) of
+        //Min-Max
+        1:
+        begin
+          newMin := MainUnit.LASTNORMALIZATION[j, 1];
+          newMax := MainUnit.LASTNORMALIZATION[j, 2];
+          if (newMin < newMax) then
+          begin
+            minMaxValues := MainForm.GetColMinMaxValues(TESTMATRIX, j);
+            MainForm.MinMaxDMCol(TESTMATRIX, j, minMaxValues[0], minMaxValues[1], newMin, newMax);
+          end
+          else
+            raise  ERangeError.Create('invalid range');
+        end;
+        //Z-Score
+        2:
+        begin
+          MainForm.ZScoreDMCol(TESTMATRIX, j);
+        end;
+        //Decimal Scaling
+        3:
+        begin
+          MainForm.DecimalScalingDMCol(TESTMATRIX, j);
+        end;
+      end;
+    end;
+    UpdateStringGrids();
+  end;
+end;
  
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FUNCIONES<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
 
@@ -754,7 +799,7 @@ end;
 
 procedure TTesterForm.FormActivate(Sender: TObject);
 begin
-   //LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
+   LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));
   //LoadTesterData(MainForm.LoadCSVFileToMatrix('data_sets\ST2_TestSet_OneRow.txt'));
 end;
 
