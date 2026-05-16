@@ -1,10 +1,10 @@
 object TesterForm: TTesterForm
   Left = 353
-  Height = 540
+  Height = 600
   Top = 250
   Width = 1128
   Caption = 'Tester'
-  ClientHeight = 540
+  ClientHeight = 600
   ClientWidth = 1128
   DesignTimePPI = 106
   LCLVersion = '4.4.0.0'
@@ -249,7 +249,7 @@ object TesterForm: TTesterForm
   end
   object KFoldStatsStringGrid: TStringGrid
     Left = 632
-    Height = 48
+    Height = 120
     Top = 472
     Width = 210
     ColCount = 3

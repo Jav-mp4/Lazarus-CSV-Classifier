@@ -27,7 +27,6 @@ type
     InterChartCanvasImg: TImage;
     InterChartMenuItem: TMenuItem;
     SaveDataMenuItem: TMenuItem;
-    StringGrid1: TStringGrid;
     TesterBtn: TButton;
     ClearDataBtn: TButton;
     CurrentRowEdit: TEdit;
@@ -395,9 +394,9 @@ end;
 procedure TMainForm.ApplyDIANA(TrainingSetIndexes: TDoubleMatrix);
 var
   //Dis = Distance, Cl = Cluster
-  i, j, cl, chosenCluster, MaxDisimilIndex, oldClIndex, newClIndex, cicleCounter, indexCounter: integer;
+  i, j, cl, chosenCluster, MaxDisimilIndex, oldClIndex, newClIndex, firstCicleCounter, secondCicleCounter, indexCounter: integer;
   oldClAvrgDis, newClAvrgDis: double;
-  cicleHadChanges: boolean;
+  firstCicleHadChanges, secondCicleHadChanges: boolean;
   indexCurrentCluster: array of array of integer;
   colRangeValues, minMax, avrgDisimilarity, clHeterogeneity: TDoubleArray;
   distanceMatrix: TDoubleMatrix;
@@ -417,9 +416,6 @@ begin
     end;
   end;
 
-
-  StringGrid1.ColCount := DMROWSIZE;
-  StringGrid1.RowCount := DMROWSIZE;
   //Se obtienen las distancias entre todos los elementos pero sin repetir los ya calculados e ignorando el calculo de la distancia con sigo mismo
   SetLength(distanceMatrix, DMROWSIZE);
   for i := 0 to DMROWSIZE - 1 do
@@ -428,19 +424,19 @@ begin
     //Ejemplo: distanceMatrix = [ [0,1], [0,2], [0,3], [0,4], [0,5], [1,2], [1,3], [1,4], [1,5], [2,3], [2,4], [2,5], [3,4], [3,5], [4,5] ]
     SetLength(distanceMatrix[i], DMROWSIZE - i - 1);
     for j := 0 to Length(distanceMatrix[i]) - 1 do
-    begin
       distanceMatrix[i, j] := GetGowerDistance(DATAMATRIX[i], DATAMATRIX[j + i + 1], colRangeValues);
-      StringGrid1.Cells[i, j + i + 1] := floattostr(distanceMatrix[i, j]);
-      StringGrid1.Cells[j + i + 1, i] := floattostr(distanceMatrix[i, j]);
-    end;
   end;
 
   //El primer cluster contendra a todos los elementos
   SetLength(clusters, 1, DMROWSIZE);
   for i := 0 to DMROWSIZE - 1 do
     clusters[0, i] := i;
-
+  
+  firstCicleCounter := 0;
   repeat
+    firstCicleHadChanges := False;
+    firstCicleCounter += 1;
+
     //Se obtiene el valor de heterogeneidad de cada cluster
     SetLength(clHeterogeneity, Length(Clusters));
     for cl := 0 to Length(clusters) - 1 do
@@ -498,23 +494,22 @@ begin
     newClIndex := Length(clusters) - 1;
     SetLength(clusters[newClIndex], 1);
     clusters[newClIndex, 0] := MaxDisimilIndex;
+    for i := 0 to Length(indexCurrentCluster)-1 do
+      if (indexCurrentCluster[i, 0] = MaxDisimilIndex) then
+        indexCurrentCluster[i, 1] := 1;
     clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], MaxDisimilIndex);
 
 
     //Se recalculan distancias promedio entre clusters hasta que todos esten agrupados en su cluster mas cercano
-    cicleCounter := 0;
+    secondCicleCounter := 0;
     repeat
-      test1 := '';
-      test2 := '';
-      for i := 0 to Length(clusters[oldClIndex]) - 1 do
-        test1 += IntToStr(clusters[oldClIndex, i]) + ' ';
-      for i := 0 to Length(clusters[newClIndex]) - 1 do
-        test2 += IntToStr(clusters[newClIndex, i]) + ' ';
-      ShowMessage('old: ' + test1 + ' new: ' + test2);
-      cicleCounter += 1;
-      cicleHadChanges := False;
+      secondCicleCounter += 1;
+      secondCicleHadChanges := False;
+
       for i := 0 to Length(indexCurrentCluster) - 1 do
       begin
+        //showmessage(inttostr(indexCurrentCluster[i, 0]));
+
         //Se mide el promedio de las distancias del elemento i con respecto a los elementos dentro de los clusters
         oldClAvrgDis := 0;
         newClAvrgDis := 0;
@@ -542,7 +537,7 @@ begin
             //Se elimina el elemento del cluster viejo y se actualiza su cluster actual en indexCurrentCluster
             clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], indexCurrentCluster[i, 0]);
             indexCurrentCluster[i, 1] := 1;
-            cicleHadChanges := True;
+            secondCicleHadChanges := True;
           end;
         end
         else
@@ -558,12 +553,23 @@ begin
             //Se elimina el elemento del cluster nuevo y se actualiza su cluster actual en indexCurrentCluster
             clusters[newClIndex] := DeleteValueFromIntArray(clusters[newClIndex], indexCurrentCluster[i, 0]);
             indexCurrentCluster[i, 1] := 0;
-            cicleHadChanges := True;
+            secondCicleHadChanges := True;
           end;
         end;
+        if (secondCicleHadChanges) then
+           firstCicleHadChanges := True;
       end;
-    until not (cicleHadChanges) or (cicleCounter > 200);
-  until (Length(clusters) > 3);
+    until not (secondCicleHadChanges) or (secondCicleCounter > 200);
+    {test1 := '';
+    for cl := 0 to Length(clusters)-1 do
+    begin
+      test1 += inttostr(cl)+': ';
+      for i := 0 to Length(clusters[cl])-1 do
+        test1 += inttostr(clusters[cl, i])+' ';
+      test1 += '  ';
+    end;
+    showmessage(test1);}
+  until not(firstCicleHadChanges) or (FirstCicleCounter > 200);
 
   DATATAG[DMCOLSIZE] := Length(clusters);
   DataStringGrid.Cells[DMCOLSIZE, 0] := IntToStr(Length(clusters));
