@@ -90,7 +90,7 @@ type
     //Funciones
     procedure ApplyDIANA(TrainingSetIndexes: TDoubleMatrix);
     function GetDistanceFromDMatrix(distanceMatrix: TDoubleMatrix;i, j: integer): double;
-    function DeleteRowFromIntArray(IntArray: TIntegerArray; indexToDelete: Integer):TIntegerArray;
+    function DeleteValueFromIntArray(IntArray: TIntegerArray; valueToDelete: Integer): TIntegerArray;
     function GetGowerDistance(x: TDoubleArray; y: TDoubleArray; ranges: TDoubleArray):Double;
     procedure UpdateDataChart();
     procedure SynchNormalizeTypeValues();
@@ -395,11 +395,13 @@ end;
 procedure TMainForm.ApplyDIANA(TrainingSetIndexes: TDoubleMatrix);
 var
   //Dis = Distance, Cl = Cluster
-  i, j, chosenCluster, MaxDisimilIndex, currentClIndexNum: integer;
+  i, j, cl, chosenCluster, MaxDisimilIndex, oldClIndex, newClIndex, cicleCounter, indexCounter: integer;
   oldClAvrgDis, newClAvrgDis: double;
   cicleHadChanges: boolean;
-  colRangeValues, minMax, avrgDisimilarity: TDoubleArray;
+  indexCurrentCluster: array of array of integer;
+  colRangeValues, minMax, avrgDisimilarity, clHeterogeneity: TDoubleArray;
   distanceMatrix: TDoubleMatrix;
+  test1,test2: string;
   //clusters contiene los indices correspondientes en DATAMATRIX de todos los elementos entre de cada cluster
   clusters: array of TIntegerArray;
 begin
@@ -415,77 +417,162 @@ begin
     end;
   end;
 
-  //El primer cluster contendra a todos los elementos
-  SetLength(clusters, 1, DMROWSIZE);
-  for i := 0 to DMROWSIZE - 1 do
-    clusters[0, i] := i;
-  chosenCluster := 0;
 
-  StringGrid1.ColCount := Length(clusters[chosenCluster]);
-  StringGrid1.RowCount := Length(clusters[chosenCluster]);
-  //Se guardan las distancias entre todos los elementos pero sin repetir los ya calculados e ignorando el calculo de la distancia con sigo mismo
-  SetLength(distanceMatrix, Length(clusters[chosenCluster]));
+  StringGrid1.ColCount := DMROWSIZE;
+  StringGrid1.RowCount := DMROWSIZE;
+  //Se obtienen las distancias entre todos los elementos pero sin repetir los ya calculados e ignorando el calculo de la distancia con sigo mismo
+  SetLength(distanceMatrix, DMROWSIZE);
   for i := 0 to DMROWSIZE - 1 do
   begin
-    //Se resta 1 por que los indices inician en 0, para que desde el primer indice se quite la comparacion [0,0]
-    SetLength(distanceMatrix[i], Length(clusters[chosenCluster]) - i - 1);
+    //Se resta -1-i por que asi se evitan las comparaciones duplicadas, cada elemento de i tendra menos elementos pues ya fueron evaluados antes
+    //Ejemplo: distanceMatrix = [ [0,1], [0,2], [0,3], [0,4], [0,5], [1,2], [1,3], [1,4], [1,5], [2,3], [2,4], [2,5], [3,4], [3,5], [4,5] ]
+    SetLength(distanceMatrix[i], DMROWSIZE - i - 1);
     for j := 0 to Length(distanceMatrix[i]) - 1 do
     begin
-      distanceMatrix[i, j] := GetGowerDistance(DATAMATRIX[clusters[chosenCluster, i]], DATAMATRIX[clusters[chosenCluster, j + i + 1]], colRangeValues);
+      distanceMatrix[i, j] := GetGowerDistance(DATAMATRIX[i], DATAMATRIX[j + i + 1], colRangeValues);
       StringGrid1.Cells[i, j + i + 1] := floattostr(distanceMatrix[i, j]);
       StringGrid1.Cells[j + i + 1, i] := floattostr(distanceMatrix[i, j]);
     end;
   end;
 
-  //Se busca el elemento con la disimilitud promedio mas grande para ser el primer elemento del nuevo cluster
+  //El primer cluster contendra a todos los elementos
+  SetLength(clusters, 1, DMROWSIZE);
+  for i := 0 to DMROWSIZE - 1 do
+    clusters[0, i] := i;
 
-  //Se obtiene disimilitud promedio de cada elemento del cluster
-  SetLength(avrgDisimilarity, DMROWSIZE);
-  //Elemento siendo evaluado actualmente
-  for i := 0 to Length(clusters[chosenCluster]) - 1 do
-  begin
-    avrgDisimilarity[i] := 0;
-    //Todos los demas elementos
-    for j := 0 to Length(clusters[chosenCluster]) - 1 do
+  repeat
+    //Se obtiene el valor de heterogeneidad de cada cluster
+    SetLength(clHeterogeneity, Length(Clusters));
+    for cl := 0 to Length(clusters) - 1 do
     begin
-      //Se encuentra el promedio de todas las distancias del elemento actual con respecto a los demas
-      if not (i = j) then
+      clHeterogeneity[cl] := 0;
+      indexCounter := 0;
+      for i := 0 to Length(clusters[cl]) - 1 do
+        for j := i + 1 to Length(clusters[cl]) - 1 do
+        begin
+          clHeterogeneity[cl] += GetDistanceFromDMatrix(distanceMatrix, clusters[cl, i], clusters[cl, j]);
+          indexCounter += 1;
+        end;
+      if (indexCounter > 0) then
+        clHeterogeneity[cl] := clHeterogeneity[cl] / indexCounter;
+    end;
+    //Se elige el cluster con mayor heterogeneidad para ser dividido
+    chosenCluster := 0;
+    for cl := 0 to Length(clusters) - 1 do
+        if (clHeterogeneity[cl] > clHeterogeneity[chosenCluster]) then
+          chosenCluster := cl;
+    //Se busca el elemento con la disimilitud promedio mas grande para ser el primer elemento del nuevo cluster
+
+    //Se obtiene disimilitud promedio de cada elemento del cluster
+    SetLength(avrgDisimilarity, Length(clusters[chosenCluster]));
+    //Elemento siendo evaluado actualmente
+    for i := 0 to Length(clusters[chosenCluster]) - 1 do
+    begin
+      avrgDisimilarity[i] := 0;
+      //Todos los demas elementos
+      for j := 0 to Length(clusters[chosenCluster]) - 1 do
       begin
-        avrgDisimilarity[i] += GetDistanceFromDMatrix(distanceMatrix, i, j);
+        //Se encuentra el promedio de todas las distancias del elemento actual con respecto a los demas
+        if not (i = j) then
+          avrgDisimilarity[i] += GetDistanceFromDMatrix(distanceMatrix, clusters[chosenCluster, i], clusters[chosenCluster, j]);
       end;
+      avrgDisimilarity[i] := avrgDisimilarity[i] / (Length(clusters[chosenCluster]) - 1);
     end;
-    avrgDisimilarity[i] := avrgDisimilarity[i] / Length(clusters[chosenCluster])-1;
-  end;
-  //Se encuentra el indice con la disimilitud mas grande
-  MaxDisimilIndex := 0;
-  for i := 0 to Length(clusters[chosenCluster])-1 do
-    if (avrgDisimilarity[i] > avrgDisimilarity[MaxDisimilIndex]) then
-      MaxDisimilIndex := i;
+    //Se encuentra el indice con la disimilitud mas grande
+    MaxDisimilIndex := 0;
+    for i := 0 to Length(clusters[chosenCluster]) - 1 do
+      if (avrgDisimilarity[i] > avrgDisimilarity[MaxDisimilIndex]) then
+        MaxDisimilIndex := clusters[chosenCluster, i];
 
-  currentClIndexNum := Length(clusters[chosenCluster]);
-  //Se añade un nuevo cluster y como primer elemento se transfiere al elemento con mayor disimilitud encontrado
-  SetLength(clusters, Length(clusters)+1);
-  SetLength(clusters[Length(clusters)-1], 1);
-  clusters[Length(clusters)-1, 0] := MaxDisimilIndex;
-  //Se recalculan distancias promedio entre clusters hasta que todos esten agrupados en su cluster mas cercano
-  {repeat
-    cicleHadChanges := False;
-    for i := 0 to currentClIndexNum-1 do
+    //Se guardan todos los indices de los elementos del cluster original y el cluster al que actualmente pertenecen  0 = cluster antiguo, 1 = cluster nuevo
+    SetLength(indexCurrentCluster, Length(clusters[chosenCluster]), 2);
+    for i := 0 to Length(clusters[chosenCluster]) - 1 do
     begin
-      oldClAvrgDis := 0;
-      for j:= 0 to Length(clusters[chosenCluster])-1 do
-        oldClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, i, j);
-      oldClAvrgDis := oldClAvrgDis / Length(clusters[chosenCluster])-1
+      indexCurrentCluster[i, 0] := clusters[chosenCluster, i];
+      indexCurrentCluster[i, 1] := 0;
     end;
-  until not(cicleHadChanges);
-  clusters[chosenCluster] := DeleteRowFromIntArray(clusters[chosenCluster], MaxDisimilIndex);}
+
+    //Se añade un nuevo cluster y como primer elemento se transfiere al elemento con mayor disimilitud encontrado
+    SetLength(clusters, Length(clusters) + 1);
+    oldClIndex := chosenCluster;
+    newClIndex := Length(clusters) - 1;
+    SetLength(clusters[newClIndex], 1);
+    clusters[newClIndex, 0] := MaxDisimilIndex;
+    clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], MaxDisimilIndex);
 
 
+    //Se recalculan distancias promedio entre clusters hasta que todos esten agrupados en su cluster mas cercano
+    cicleCounter := 0;
+    repeat
+      test1 := '';
+      test2 := '';
+      for i := 0 to Length(clusters[oldClIndex]) - 1 do
+        test1 += IntToStr(clusters[oldClIndex, i]) + ' ';
+      for i := 0 to Length(clusters[newClIndex]) - 1 do
+        test2 += IntToStr(clusters[newClIndex, i]) + ' ';
+      ShowMessage('old: ' + test1 + ' new: ' + test2);
+      cicleCounter += 1;
+      cicleHadChanges := False;
+      for i := 0 to Length(indexCurrentCluster) - 1 do
+      begin
+        //Se mide el promedio de las distancias del elemento i con respecto a los elementos dentro de los clusters
+        oldClAvrgDis := 0;
+        newClAvrgDis := 0;
+        for j := 0 to Length(indexCurrentCluster) - 1 do
+        begin
+          if not (i = j) then
+          begin
+            if (indexCurrentCluster[j, 1] = 0) then
+              oldClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0])
+            else
+              newClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0]);
+          end;
+        end;
+        //Se divide entre el numero de elementos en cada cluster menos el que esta siendo evaluado y se casigna al cluster con el que tiene menor valor
+        if (indexCurrentCluster[i, 1] = 0) then
+        begin
+          if not (Length(clusters[oldClIndex]) - 1 = 0) then
+            oldClAvrgDis := oldClAvrgDis / (Length(clusters[oldClIndex]) - 1);
+          newClAvrgDis := newClAvrgDis / Length(clusters[newClIndex]);
+          if (newClAvrgDis < oldClAvrgDis) then
+          begin
+            //Se aumenta el tamaño del cluster nuevo y se agrega el elemento
+            SetLength(clusters[newClIndex], Length(clusters[newClIndex]) + 1);
+            clusters[newClIndex, Length(clusters[newClIndex]) - 1] := indexCurrentCluster[i, 0];
+            //Se elimina el elemento del cluster viejo y se actualiza su cluster actual en indexCurrentCluster
+            clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], indexCurrentCluster[i, 0]);
+            indexCurrentCluster[i, 1] := 1;
+            cicleHadChanges := True;
+          end;
+        end
+        else
+        begin
+          oldClAvrgDis := oldClAvrgDis / Length(clusters[oldClIndex]);
+          if not (Length(clusters[newClIndex]) - 1 = 0) then
+            newClAvrgDis := newClAvrgDis / (Length(clusters[newClIndex]) - 1);
+          if (oldClAvrgDis < newClAvrgDis) then
+          begin
+            //Se aumenta el tamaño del cluster viejo y se agrega el elemento
+            SetLength(clusters[oldClIndex], Length(clusters[oldClIndex]) + 1);
+            clusters[oldClIndex, Length(clusters[oldClIndex]) - 1] := indexCurrentCluster[i, 0];
+            //Se elimina el elemento del cluster nuevo y se actualiza su cluster actual en indexCurrentCluster
+            clusters[newClIndex] := DeleteValueFromIntArray(clusters[newClIndex], indexCurrentCluster[i, 0]);
+            indexCurrentCluster[i, 1] := 0;
+            cicleHadChanges := True;
+          end;
+        end;
+      end;
+    until not (cicleHadChanges) or (cicleCounter > 200);
+  until (Length(clusters) > 3);
 
-
-
-
-
+  DATATAG[DMCOLSIZE] := Length(clusters);
+  DataStringGrid.Cells[DMCOLSIZE, 0] := IntToStr(Length(clusters));
+  for cl := 0 to Length(clusters)-1 do
+    for i := 0 to Length(clusters[cl])-1 do
+      begin
+        CLASSARRAY[clusters[cl,i]] := cl;
+        DataStringGrid.Cells[DMCOLSIZE, clusters[cl,i]+1] := IntToStr(cl);
+      end;
 end;
 
 function TMainForm.GetDistanceFromDMatrix(distanceMatrix: TDoubleMatrix; i, j: integer): double;
@@ -498,11 +585,18 @@ begin
   else
     Result := distanceMatrix[i, j - i - 1];
 end;
-function TMainForm.DeleteRowFromIntArray(IntArray: TIntegerArray; indexToDelete: Integer): TIntegerArray;
+
+
+function TMainForm.DeleteValueFromIntArray(IntArray: TIntegerArray; valueToDelete: Integer): TIntegerArray;
 var
-  i: Integer;
+  i, locationInArray: Integer;
 begin
-  for i := indexToDelete to Length(IntArray)-2 do
+  //Se encuentra la posicion en el arreglo donde esta valueToDelete
+  for i := 0 to Length(IntArray)-1 do
+    if (IntArray[i] = valueToDelete) then
+      locationInArray := i;
+  //Se recorren todos los indices un lugar hacia atras apartir de valueToDelete y se reduce -1 unidad al tamaño del arreglo
+  for i := locationInArray to Length(IntArray)-2 do
      IntArray[i] := IntArray[i+1];
   SetLength(IntArray, Length(IntArray)-1);
   result := IntArray;
