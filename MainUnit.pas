@@ -508,69 +508,71 @@ begin
 
       for i := 0 to Length(indexCurrentCluster) - 1 do
       begin
-        //showmessage(inttostr(indexCurrentCluster[i, 0]));
-
-        //Se mide el promedio de las distancias del elemento i con respecto a los elementos dentro de los clusters
-        oldClAvrgDis := 0;
-        newClAvrgDis := 0;
-        for j := 0 to Length(indexCurrentCluster) - 1 do
+        if ((indexCurrentCluster[i, 1] = 0) and (Length(clusters[oldClIndex]) > 1)) or ((indexCurrentCluster[i, 1] = 1) and (Length(clusters[newClIndex]) > 1)) then
         begin
-          if not (i = j) then
+          //Se mide el promedio de las distancias del elemento i con respecto a los elementos dentro de los clusters
+          oldClAvrgDis := 0;
+          newClAvrgDis := 0;
+          for j := 0 to Length(indexCurrentCluster) - 1 do
           begin
-            if (indexCurrentCluster[j, 1] = 0) then
-              oldClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0])
-            else
-              newClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0]);
+            if not (i = j) then
+            begin
+              if (indexCurrentCluster[j, 1] = 0) then
+                oldClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0])
+              else
+                newClAvrgDis += GetDistanceFromDMatrix(distanceMatrix, indexCurrentCluster[i, 0], indexCurrentCluster[j, 0]);
+            end;
           end;
-        end;
-        //Se divide entre el numero de elementos en cada cluster menos el que esta siendo evaluado y se casigna al cluster con el que tiene menor valor
-        if (indexCurrentCluster[i, 1] = 0) then
-        begin
-          if not (Length(clusters[oldClIndex]) - 1 = 0) then
-            oldClAvrgDis := oldClAvrgDis / (Length(clusters[oldClIndex]) - 1);
-          newClAvrgDis := newClAvrgDis / Length(clusters[newClIndex]);
-          if (newClAvrgDis < oldClAvrgDis) then
+          //Se divide entre el numero de elementos en cada cluster menos el que esta siendo evaluado y se casigna al cluster con el que tiene menor valor
+          if (indexCurrentCluster[i, 1] = 0) then
           begin
-            //Se aumenta el tamaño del cluster nuevo y se agrega el elemento
-            SetLength(clusters[newClIndex], Length(clusters[newClIndex]) + 1);
-            clusters[newClIndex, Length(clusters[newClIndex]) - 1] := indexCurrentCluster[i, 0];
-            //Se elimina el elemento del cluster viejo y se actualiza su cluster actual en indexCurrentCluster
-            clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], indexCurrentCluster[i, 0]);
-            indexCurrentCluster[i, 1] := 1;
-            secondCicleHadChanges := True;
-          end;
-        end
-        else
-        begin
-          oldClAvrgDis := oldClAvrgDis / Length(clusters[oldClIndex]);
-          if not (Length(clusters[newClIndex]) - 1 = 0) then
-            newClAvrgDis := newClAvrgDis / (Length(clusters[newClIndex]) - 1);
-          if (oldClAvrgDis < newClAvrgDis) then
+            if not (Length(clusters[oldClIndex]) - 1 = 0) then
+              oldClAvrgDis := oldClAvrgDis / (Length(clusters[oldClIndex]) - 1);
+            newClAvrgDis := newClAvrgDis / Length(clusters[newClIndex]);
+            if (newClAvrgDis < oldClAvrgDis) then
+            begin
+              //Se aumenta el tamaño del cluster nuevo y se agrega el elemento
+              SetLength(clusters[newClIndex], Length(clusters[newClIndex]) + 1);
+              clusters[newClIndex, Length(clusters[newClIndex]) - 1] := indexCurrentCluster[i, 0];
+              //Se elimina el elemento del cluster viejo y se actualiza su cluster actual en indexCurrentCluster
+              clusters[oldClIndex] := DeleteValueFromIntArray(clusters[oldClIndex], indexCurrentCluster[i, 0]);
+              indexCurrentCluster[i, 1] := 1;
+              secondCicleHadChanges := True;
+            end;
+          end
+          else
           begin
-            //Se aumenta el tamaño del cluster viejo y se agrega el elemento
-            SetLength(clusters[oldClIndex], Length(clusters[oldClIndex]) + 1);
-            clusters[oldClIndex, Length(clusters[oldClIndex]) - 1] := indexCurrentCluster[i, 0];
-            //Se elimina el elemento del cluster nuevo y se actualiza su cluster actual en indexCurrentCluster
-            clusters[newClIndex] := DeleteValueFromIntArray(clusters[newClIndex], indexCurrentCluster[i, 0]);
-            indexCurrentCluster[i, 1] := 0;
-            secondCicleHadChanges := True;
+            oldClAvrgDis := oldClAvrgDis / Length(clusters[oldClIndex]);
+            if not (Length(clusters[newClIndex]) - 1 = 0) then
+              newClAvrgDis := newClAvrgDis / (Length(clusters[newClIndex]) - 1);
+            if (oldClAvrgDis < newClAvrgDis) then
+            begin
+              //Se aumenta el tamaño del cluster viejo y se agrega el elemento
+              SetLength(clusters[oldClIndex], Length(clusters[oldClIndex]) + 1);
+              clusters[oldClIndex, Length(clusters[oldClIndex]) - 1] := indexCurrentCluster[i, 0];
+              //Se elimina el elemento del cluster nuevo y se actualiza su cluster actual en indexCurrentCluster
+              clusters[newClIndex] := DeleteValueFromIntArray(clusters[newClIndex], indexCurrentCluster[i, 0]);
+              indexCurrentCluster[i, 1] := 0;
+              secondCicleHadChanges := True;
+            end;
           end;
         end;
         if (secondCicleHadChanges) then
-           firstCicleHadChanges := True;
+          firstCicleHadChanges := True;
       end;
-    until not (secondCicleHadChanges) or (secondCicleCounter > 200);
-    {test1 := '';
-    for cl := 0 to Length(clusters)-1 do
-    begin
-      test1 += inttostr(cl)+': ';
-      for i := 0 to Length(clusters[cl])-1 do
-        test1 += inttostr(clusters[cl, i])+' ';
-      test1 += '  ';
-    end;
-    showmessage(test1);}
-  until not(firstCicleHadChanges) or (FirstCicleCounter > 200);
 
+    until not (secondCicleHadChanges) or (secondCicleCounter > 200);
+  until not (firstCicleHadChanges) or (FirstCicleCounter > 200);
+
+  {test1 := '';
+  for cl := 0 to Length(clusters) - 1 do
+  begin
+    test1 += IntToStr(cl) + ': ';
+    for j := 0 to Length(clusters[cl]) - 1 do
+      test1 += IntToStr(clusters[cl, j]) + ' ';
+    test1 += '  ';
+  end;
+  ShowMessage(test1);}
   DATATAG[DMCOLSIZE] := Length(clusters);
   DataStringGrid.Cells[DMCOLSIZE, 0] := IntToStr(Length(clusters));
   for cl := 0 to Length(clusters)-1 do
@@ -1871,16 +1873,17 @@ begin
   //Cargar elementos para prueba de Static Chart//
   XCOLINDEX := 0;
   YCOLINDEX := 1;
+  DMISSUPERVISED := False;
   OpenDialog1.InitialDir := ExtractFilePath('project1.exe') + '\data_sets';
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_short.txt'));
   {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_TestSet.txt'));}
-  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));}
+  {LoadMainData(LoadCSVFileToMatrix('data_sets\ST2.txt'));
+  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_Unsupervised_Short.txt'));}
   //Cargar elementos para prueba de TesterUnit//
   {TesterForm.ShowModal;}
   //Cargar elementos para prueba de Interactive Chart//
   {LoadInteractiveChart();}
   //Cargar elementos para prueba de datos no supervisados//
-  DMISSUPERVISED := False;
-  LoadMainData(LoadCSVFileToMatrix('data_sets\ST2_Unsupervised_Short.txt'));
 end;
 
 procedure TMainForm.InterChartCanvasImgMouseDown(Sender: TObject;
